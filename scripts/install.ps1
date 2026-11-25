@@ -8,6 +8,7 @@
 #   - creates a private Python environment in %LOCALAPPDATA%\ClipKit\venv
 #   - installs ClipKit into it (from this clone, or from GitHub without needing git)
 #   - adds a `clipkit` command in %LOCALAPPDATA%\ClipKit\bin and puts that folder on the user PATH
+#   - adds a "ClipKit" Start menu shortcut that opens the app window
 # Optional environment variables: CLIPKIT_REPO (owner/name), CLIPKIT_REF (branch or tag).
 # The file is kept ASCII-only so Windows PowerShell 5.1 reads it correctly.
 
@@ -18,6 +19,7 @@ $Uninstall = ($args -contains "-Uninstall")
 $Root = Join-Path $env:LOCALAPPDATA "ClipKit"
 $Venv = Join-Path $Root "venv"
 $Bin = Join-Path $Root "bin"
+$Shortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "ClipKit.lnk"
 
 function Set-UserPath([string]$Dir, [bool]$Add) {
     $current = [Environment]::GetEnvironmentVariable("Path", "User")
@@ -27,9 +29,9 @@ function Set-UserPath([string]$Dir, [bool]$Add) {
 }
 
 if ($Uninstall) {
-    Remove-Item $Venv, $Bin -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item $Venv, $Bin, $Shortcut -Recurse -Force -ErrorAction SilentlyContinue
     Set-UserPath $Bin $false
-    Write-Host "Da go ClipKit. Model Whisper va FFmpeg van o $Root, xoa tay neu muon."
+    Write-Host "ClipKit removed. Whisper models and FFmpeg are still in $Root; delete that folder to free the space."
     return
 }
 
@@ -43,7 +45,7 @@ foreach ($cand in @(@("py", "-3"), @("python"), @("python3"))) {
     if ($ok -eq "True") { $python = @($exe.Source) + @($cand | Select-Object -Skip 1); break }
 }
 if (-not $python) {
-    Write-Host "Can Python 3.10 tro len. Cai bang lenh duoi, mo lai PowerShell roi chay lai:" -ForegroundColor Yellow
+    Write-Host "Python 3.10 or newer is required. Install it with the command below, reopen PowerShell and run this again:" -ForegroundColor Yellow
     Write-Host "    winget install Python.Python.3.12"
     return
 }
@@ -52,7 +54,7 @@ if (-not $python) {
 New-Item -ItemType Directory -Force $Root, $Bin | Out-Null
 $vpy = Join-Path $Venv "Scripts\python.exe"
 if (-not (Test-Path $vpy)) {
-    Write-Host "Tao moi truong Python trong $Venv ..."
+    Write-Host "Creating a Python environment in $Venv ..."
     $venvArgs = @($python | Select-Object -Skip 1) + @("-m", "venv", $Venv)
     & $python[0] @venvArgs
 }
@@ -65,16 +67,21 @@ if ($local -and (Test-Path (Join-Path $local "pyproject.toml"))) {
 } else {
     $spec = "https://github.com/$Repo/archive/$Ref.zip"
 }
-Write-Host "Cai ClipKit tu $spec (lan dau mat vai phut) ..."
+Write-Host "Installing ClipKit from $spec (the first time takes a few minutes) ..."
 & $vpy -m pip install --quiet --upgrade $spec
-if ($LASTEXITCODE -ne 0) { throw "pip install that bai." }
+if ($LASTEXITCODE -ne 0) { throw "pip install failed." }
 
-# 4. `clipkit` command on PATH
+# 4. `clipkit` command on PATH and a Start menu shortcut for the window
 Set-Content -Path (Join-Path $Bin "clipkit.cmd") -Encoding ASCII -Value "@`"$Venv\Scripts\clipkit.exe`" %*"
 Set-UserPath $Bin $true
 $env:Path = "$env:Path;$Bin"
+$shell = New-Object -ComObject WScript.Shell
+$lnk = $shell.CreateShortcut($Shortcut)
+$lnk.TargetPath = Join-Path $Venv "Scripts\clipkit-gui.exe"
+$lnk.Description = "Cut long videos into captioned short clips"
+$lnk.Save()
 
 & (Join-Path $Venv "Scripts\clipkit.exe") doctor
 Write-Host ""
-Write-Host "Xong! Mo cua so cmd/PowerShell moi roi go:" -ForegroundColor Green
+Write-Host "Done! Open ClipKit from the Start menu, or open a new terminal and type:" -ForegroundColor Green
 Write-Host '    clipkit run "https://www.youtube.com/watch?v=..." -n 5'

@@ -1,5 +1,5 @@
 # Build the Windows downloads:
-#   dist\ClipKit\                     app folder (ClipKit.exe + Python runtime + ffmpeg)
+#   dist\ClipKit\                     app folder (ClipKitApp.exe, clipkit.exe, Python runtime, ffmpeg)
 #   dist\ClipKit-<ver>-portable.zip   unzip-and-run version
 #   dist\ClipKit-Setup-<ver>.exe      installer (needs Inno Setup 6: winget install JRSoftware.InnoSetup)
 #
@@ -25,12 +25,9 @@ if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
 $version = (& $py -c "import clipkit; print(clipkit.__version__)").Trim()
 Write-Host "Building ClipKit $version"
 
-# 2. PyInstaller (one folder: faster start-up than one-file, and AV scanners like it better)
-& $py -m PyInstaller --noconfirm --clean --onedir --console --name ClipKit `
-    --collect-all faster_whisper --collect-all ctranslate2 --collect-all onnxruntime `
-    --collect-all av --collect-submodules yt_dlp `
-    --distpath dist --workpath build --specpath build `
-    scripts\clipkit_entry.py
+# 2. PyInstaller (one folder: faster start-up than one-file, and AV scanners like it better).
+#    The spec builds clipkit.exe (command line) and ClipKitApp.exe (app window) side by side.
+& $py -m PyInstaller --noconfirm --clean --distpath dist --workpath build scripts\clipkit.spec
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 $app = Join-Path $Root "dist\ClipKit"
 
@@ -59,8 +56,10 @@ if ($DownloadFfmpeg) {
 Copy-Item README.md, LICENSE -Destination $app
 
 # 4. Smoke test the frozen app
-& (Join-Path $app "ClipKit.exe") doctor
-if ($LASTEXITCODE -ne 0) { throw "ClipKit.exe doctor failed" }
+& (Join-Path $app "clipkit.exe") doctor
+if ($LASTEXITCODE -ne 0) { throw "clipkit.exe doctor failed" }
+if (-not (Test-Path (Join-Path $app "ClipKitApp.exe"))) { throw "ClipKitApp.exe missing" }
+if (-not (Get-ChildItem $app -Recurse -Filter index.html | Where-Object { $_.FullName -match "webui" })) { throw "web UI files missing" }
 
 # 5. Portable zip
 $portable = Join-Path $Root "dist\ClipKit-$version-portable.zip"

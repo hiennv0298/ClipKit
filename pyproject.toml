@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "clipkit"
-version = "0.1.0"
-description = "Cắt video dài thành clip ngắn 9:16 có phụ đề bằng yt-dlp, Whisper và FFmpeg — không cần API key."
+version = "0.2.0"
+description = "Cut long videos into captioned 9:16 short clips with yt-dlp, Whisper and FFmpeg - no API key needed."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -21,8 +21,14 @@ dev = ["pytest>=8", "pyinstaller>=6.10"]
 [project.scripts]
 clipkit = "clipkit.cli:main"
 
+[project.gui-scripts]
+clipkit-gui = "clipkit.gui:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+clipkit = ["webui/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

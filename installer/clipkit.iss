@@ -2,7 +2,7 @@
 ; Installs per user (no admin) into %LOCALAPPDATA%\Programs\ClipKit.
 
 #ifndef AppVersion
-  #define AppVersion "0.1.0"
+  #define AppVersion "0.2.0"
 #endif
 
 [Setup]
@@ -22,7 +22,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ChangesEnvironment=yes
 WizardStyle=modern
-UninstallDisplayIcon={app}\ClipKit.exe
+UninstallDisplayIcon={app}\ClipKitApp.exe
 UninstallDisplayName=ClipKit
 
 [Languages]
@@ -36,15 +36,15 @@ Name: "addtopath"; Description: "Add ClipKit to PATH (lets you type 'clipkit' in
 Source: "..\dist\ClipKit\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\ClipKit"; Filename: "{app}\ClipKit.exe"
-Name: "{autodesktop}\ClipKit"; Filename: "{app}\ClipKit.exe"; Tasks: desktopicon
+Name: "{autoprograms}\ClipKit"; Filename: "{app}\ClipKitApp.exe"
+Name: "{autodesktop}\ClipKit"; Filename: "{app}\ClipKitApp.exe"; Tasks: desktopicon
 
 [Registry]
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; \
   ValueData: "{olddata};{app}"; Tasks: addtopath; Check: NeedsAddPath(ExpandConstant('{app}'))
 
 [Run]
-Filename: "{app}\ClipKit.exe"; Description: "Open ClipKit now"; Flags: postinstall nowait skipifsilent
+Filename: "{app}\ClipKitApp.exe"; Description: "Open ClipKit now"; Flags: postinstall nowait skipifsilent
 
 [Code]
 function NeedsAddPath(Dir: string): Boolean;

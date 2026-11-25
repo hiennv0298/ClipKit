@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClipKit</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236d5dfc'/%3E%3Cpath d='M12 9l12 7-12 7z' fill='white'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #0b0d14; --surface: #131722; --surface-2: #1a1f2d; --border: #252c3d; --border-2: #323a4f;
+    --text: #e8ebf3; --muted: #8b93a8; --faint: #5d6579;
+    --accent: #6d5dfc; --accent-2: #9b5cf6; --accent-soft: rgba(109, 93, 252, .16);
+    --ok: #22c55e; --warn: #f5b942; --bad: #f05d5d;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif; }
+  body { min-height: 100vh; }
+  a { color: inherit; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+
+  header { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 12px;
+    padding: 14px 28px; background: rgba(11, 13, 20, .85); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border); }
+  .logo { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+  .brand { font-weight: 700; font-size: 17px; letter-spacing: .2px; cursor: pointer; }
+  .ver { color: var(--faint); font-size: 12px; }
+  .spacer { flex: 1; }
+  main { max-width: 1240px; margin: 0 auto; padding: 28px; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 38px;
+    padding: 0 16px; border-radius: 10px; border: 1px solid var(--border-2); background: var(--surface-2);
+    cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s, opacity .15s; }
+  .btn:hover { background: #222838; border-color: #3d4660; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.primary { border: 0; background: linear-gradient(135deg, var(--accent), var(--accent-2)); font-weight: 600;
+    box-shadow: 0 6px 20px rgba(109, 93, 252, .28); }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.big { height: 46px; padding: 0 22px; font-size: 15px; }
+  .btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+  .btn.ghost:hover { color: var(--text); background: var(--surface-2); }
+  .btn.small { height: 30px; padding: 0 11px; font-size: 13px; border-radius: 8px; }
+  .btn.danger { color: #ffb4b4; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+  .hero { padding: 30px; background:
+      radial-gradient(900px 260px at 0% 0%, rgba(109, 93, 252, .20), transparent 60%),
+      radial-gradient(700px 240px at 100% 0%, rgba(155, 92, 246, .12), transparent 60%), var(--surface); }
+  .hero h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -.2px; }
+  .hero p { margin: 0 0 22px; color: var(--muted); }
+  .source-row { display: flex; gap: 10px; }
+  .input { width: 100%; height: 46px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border-2);
+    background: #0e1119; outline: none; transition: border-color .15s, box-shadow .15s; }
+  .input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .input.sm { height: 34px; padding: 0 10px; border-radius: 8px; }
+  .num { width: 64px; text-align: center; }
+
+  .opts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; margin-top: 18px; }
+  .opt { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+  .opt b { color: var(--text); font-weight: 500; }
+  select.input { padding-right: 28px; }
+  .seg { display: inline-flex; padding: 3px; border-radius: 10px; background: #0e1119; border: 1px solid var(--border-2); }
+  .seg button { height: 28px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent;
+    color: var(--muted); cursor: pointer; }
+  .seg button.on { background: var(--surface-2); color: var(--text); box-shadow: 0 1px 0 rgba(255,255,255,.05) inset; }
+  .more { margin-top: 18px; padding-top: 18px; border-top: 1px dashed var(--border-2);
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px 22px; }
+  .field label { display: block; color: var(--muted); font-size: 12.5px; margin-bottom: 6px; }
+  .toggles { display: flex; flex-wrap: wrap; gap: 8px 18px; grid-column: 1 / -1; }
+  .check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text); user-select: none; }
+  .check input { width: 16px; height: 16px; accent-color: var(--accent); }
+  .hint { color: var(--faint); font-size: 12.5px; }
+  .link { background: none; border: 0; padding: 0; color: var(--muted); cursor: pointer; text-decoration: underline;
+    text-underline-offset: 3px; }
+  .link:hover { color: var(--text); }
+
+  .section-head { display: flex; align-items: center; gap: 12px; margin: 34px 0 14px; }
+  .section-head h2 { margin: 0; font-size: 17px; }
+  .count { color: var(--faint); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
+  .project { overflow: hidden; cursor: pointer; transition: transform .15s, border-color .15s; }
+  .project:hover { transform: translateY(-2px); border-color: var(--border-2); }
+  .thumb { position: relative; aspect-ratio: 16 / 9; background: #0e1119 center / cover no-repeat; }
+  .badge { position: absolute; padding: 2px 8px; border-radius: 6px; background: rgba(0,0,0,.72); font-size: 12px; }
+  .thumb .badge { right: 8px; bottom: 8px; }
+  .project .body { padding: 12px 14px 14px; }
+  .project .title { font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; min-height: 40px; }
+  .meta { color: var(--muted); font-size: 12.5px; margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border-radius: 999px;
+    font-size: 12px; border: 1px solid var(--border-2); color: var(--muted); }
+  .pill.ok { color: #86efac; border-color: rgba(34, 197, 94, .35); background: rgba(34, 197, 94, .08); }
+  .pill.warn { color: #fcd57a; border-color: rgba(245, 185, 66, .35); background: rgba(245, 185, 66, .08); }
+  .pill.accent { color: #c4bcff; border-color: rgba(109, 93, 252, .45); background: var(--accent-soft); }
+  .empty { padding: 40px; text-align: center; color: var(--muted); border-style: dashed; }
+
+  .banner { margin-top: 16px; padding: 12px 16px; display: flex; align-items: center; gap: 14px; }
+  .banner .bar { flex: 1; }
+
+  /* project page */
+  .back { margin-bottom: 14px; }
+  .proj-head { display: flex; gap: 20px; align-items: flex-start; }
+  .proj-head h1 { margin: 0 0 6px; font-size: 22px; line-height: 1.3; }
+  .progress { margin-top: 18px; padding: 18px 20px; }
+  .steps { display: flex; gap: 8px; margin-bottom: 14px; }
+  .step { flex: 1; display: flex; align-items: center; gap: 8px; color: var(--faint); font-size: 13px; }
+  .step .dot { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px;
+    border: 1px solid var(--border-2); flex: none; }
+  .step.active { color: var(--text); }
+  .step.active .dot { border-color: var(--accent); background: var(--accent-soft); color: #c4bcff; }
+  .step.done { color: var(--muted); }
+  .step.done .dot { border-color: transparent; background: var(--ok); color: #05210f; }
+  .bar { height: 8px; border-radius: 99px; background: #0e1119; overflow: hidden; border: 1px solid var(--border); }
+  .bar > i { display: block; height: 100%; width: 0; border-radius: 99px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .4s; }
+  .status-row { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+  .status { flex: 1; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .error { margin-top: 12px; padding: 12px 14px; border-radius: 10px; background: rgba(240, 93, 93, .1);
+    border: 1px solid rgba(240, 93, 93, .35); color: #ffc9c9; white-space: pre-wrap; font-size: 13px;
+    max-height: 200px; overflow: auto; }
+  pre.log { margin: 12px 0 0; padding: 12px; max-height: 220px; overflow: auto; border-radius: 10px;
+    background: #0a0c12; border: 1px solid var(--border); color: #aab2c5; font: 12px/1.5 Consolas, monospace; }
+
+  .toolbar { position: sticky; top: 59px; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+    margin: 26px 0 16px; padding: 12px 0; background: var(--bg); }
+  .toolbar h2 { margin: 0; font-size: 17px; }
+
+  .moments { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 18px; }
+  .moment { overflow: hidden; display: flex; flex-direction: column; transition: opacity .2s, border-color .2s; }
+  .moment.off { opacity: .5; }
+  .moment.off:hover { opacity: .8; }
+  .media { position: relative; aspect-ratio: 9 / 16; background: #07080c; overflow: hidden; }
+  .media .blur { position: absolute; inset: -20px; background: center / cover no-repeat; filter: blur(18px) brightness(.55); }
+  .media img.fg { position: absolute; left: 0; top: 50%; width: 100%; transform: translateY(-50%); }
+  .media video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
+  .media .rank { left: 10px; top: 10px; font-weight: 600; }
+  .media .dur { right: 10px; top: 10px; }
+  .media .state { left: 10px; bottom: 10px; }
+  .use { position: absolute; right: 10px; bottom: 10px; display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border-radius: 8px; background: rgba(0,0,0,.72); cursor: pointer; font-size: 12.5px; user-select: none; }
+  .use input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
+  .moment .body { padding: 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  textarea.title { width: 100%; resize: none; border: 1px solid transparent; border-radius: 8px; background: transparent;
+    padding: 6px 8px; margin: -6px -8px 0; width: calc(100% + 16px); font-weight: 600; line-height: 1.35; outline: none; }
+  textarea.title:hover { border-color: var(--border-2); }
+  textarea.title:focus { border-color: var(--accent); background: #0e1119; }
+  .times { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12.5px; }
+  .times input { width: 70px; height: 28px; padding: 0 6px; text-align: center; border-radius: 7px;
+    border: 1px solid var(--border-2); background: #0e1119; outline: none; font-size: 12.5px; }
+  .times input:focus { border-color: var(--accent); }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .excerpt { color: var(--muted); font-size: 12.5px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden; cursor: pointer; }
+  .excerpt.open { -webkit-line-clamp: unset; }
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: auto; padding-top: 4px; }
+
+  .toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px); opacity: 0;
+    padding: 10px 16px; border-radius: 10px; background: #232a3b; border: 1px solid var(--border-2);
+    transition: opacity .2s, transform .2s; pointer-events: none; z-index: 50; max-width: 80vw; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.bad { background: #3a1d22; border-color: rgba(240, 93, 93, .5); }
+  .skeleton { aspect-ratio: 9 / 16; border-radius: var(--radius); border: 1px solid var(--border);
+    background: linear-gradient(100deg, var(--surface) 40%, #1b2030 50%, var(--surface) 60%) 0 0 / 300% 100%;
+    animation: shimmer 1.6s infinite linear; }
+  @keyframes shimmer { to { background-position: -150% 0; } }
+  @media (max-width: 640px) { main { padding: 16px; } .source-row { flex-direction: column; } header { padding: 12px 16px; }
+    .ver { display: none; } .toolbar { top: 55px; } }
+  header .btn { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  body { overflow-x: hidden; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M5 3.5l8 4.5-8 4.5z" fill="#fff"/></svg></div>
+  <div class="brand" onclick="go('#/')">ClipKit</div>
+  <span class="ver" id="ver"></span>
+  <div class="spacer"></div>
+  <button class="btn ghost small" onclick="api('/api/open', {})">Open output folder</button>
+</header>
+<main id="view"></main>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $ = (s, el = document) => el.querySelector(s);
+let S = { settings: null, state: {}, project: null, projects: [], route: "" };
+let pollTimer = null, saveTimer = null, lastPhase = "", lastProjectStamp = "";
+
+// ---------- helpers
+function h(tag, attrs = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "class") el.className = v;
+    else if (k === "style") el.style.cssText = v;
+    else if (k === "html") el.innerHTML = v;
+    else if (k === "value" || (k in el && typeof v !== "string")) el[k] = v;
+    else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false)
+    el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  return el;
+}
+async function api(url, body) {
+  const opts = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json", "X-ClipKit": "1" },
+    body: JSON.stringify(body) };
+  const res = await fetch(url, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) { toast(data.error || `Request failed (${res.status})`, true); throw new Error(data.error); }
+  return data;
+}
+function put(el, ...kids) { el.append(...kids.flat().filter(k => k !== null && k !== undefined && k !== false)); }
+function toast(msg, bad) {
+  const t = $("#toast"); t.textContent = msg.length > 300 ? msg.slice(-300) : msg; t.className = "toast show" + (bad ? " bad" : "");
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.className = "toast", bad ? 6000 : 2400);
+}
+const ts = s => { s = Math.max(0, +s); const m = Math.floor(s / 60); return `${m}:${(s - m * 60).toFixed(1).padStart(4, "0")}`; };
+const tsShort = s => { s = Math.max(0, Math.round(+s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(x).padStart(2, "0")}` : `${m}:${String(x).padStart(2, "0")}`; };
+function parseTs(v) { const p = String(v).trim().split(":"); if (!p[0] || p.length > 3) return NaN;
+  return p.reduce((t, x) => t * 60 + Number(x), 0); }
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+const isCC = lic => /creative commons/i.test(lic || "");
+function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
+
+// ---------- data
+async function loadSettings() { S.settings = await api("/api/settings"); }
+async function saveSettings(patch) { Object.assign(S.settings, patch); S.settings = await api("/api/settings", S.settings); }
+async function poll() {
+  try {
+    const st = await (await fetch("/api/state")).json();
+    const prev = S.state; S.state = st;
+    $("#ver").textContent = "v" + st.version;
+    onState(prev, st);
+  } catch (e) { /* app closed */ }
+}
+function onState(prev, st) {
+  const inProject = S.route.startsWith("#/p/");
+  if (S.waitingForProject && st.project) { S.waitingForProject = false; go("#/p/" + encodeURIComponent(st.project)); return; }
+  if (S.waitingForProject && !st.busy && ["error", "stopped"].includes(st.phase)) {
+    S.waitingForProject = false;  // failed before the video was downloaded, e.g. a bad link
+    toast(st.error || "Stopped.", !!st.error);
+  }
+  if (inProject) {
+    const pid = decodeURIComponent(S.route.slice(4));
+    updateProgress();
+    const finished = prev.busy && !st.busy;
+    const newMoments = st.project === pid && st.phase !== prev.phase && ["review", "rendering", "done"].includes(st.phase);
+    const clipDone = st.project === pid && st.phase === "rendering" && st.status !== prev.status && /done in/.test(st.status);
+    const titleReady = !S.project && st.project === pid && st.step >= 2 && !S.projectRequested;
+    if (titleReady) S.projectRequested = true;
+    if (finished || newMoments || clipDone || titleReady) loadProject(pid);
+  } else if (S.route === "#/" || S.route === "") {
+    updateBanner();
+    if (prev.busy && !st.busy) loadProjects();
+  }
+}
+async function loadProjects() { S.projects = await api("/api/projects"); if (!S.route.startsWith("#/p/")) renderProjects(); }
+async function loadProject(pid) {
+  try { S.project = await api("/api/project?id=" + encodeURIComponent(pid)); }
+  catch (e) { S.project = null; }
+  if (S.route === "#/p/" + encodeURIComponent(pid)) renderMoments();
+}
+
+// ---------- routing
+window.addEventListener("hashchange", render);
+function render() {
+  S.route = location.hash || "#/";
+  const view = $("#view"); view.innerHTML = "";
+  if (S.route.startsWith("#/p/")) { const pid = decodeURIComponent(S.route.slice(4)); view.append(projectPage(pid)); S.project = null;
+    S.projectRequested = false; loadProject(pid); }
+  else { view.append(homePage()); loadProjects(); }
+  window.scrollTo(0, 0);
+}
+
+// ---------- home
+function homePage() {
+  const s = S.settings;
+  const src = h("input", { class: "input", id: "source", placeholder: "Paste a YouTube, TikTok or Facebook link, or choose a video file",
+    onkeydown: e => { if (e.key === "Enter") find(); } });
+  const segCtl = (key, items) => h("div", { class: "seg" }, items.map(([v, label]) =>
+    h("button", { class: s[key] === v ? "on" : "", onclick: async e => { await saveSettings({ [key]: v });
+      [...e.target.parentNode.children].forEach(b => b.classList.toggle("on", b === e.target)); } }, label)));
+  const num = (key, min, max, step = 1) => h("input", { class: "input sm num", type: "number", min, max, step, value: s[key],
+    onchange: e => saveSettings({ [key]: Number(e.target.value) }) });
+  const sel = (key, items) => h("select", { class: "input sm", onchange: e => saveSettings({ [key]: e.target.value }) },
+    items.map(([v, label]) => h("option", { value: v, selected: s[key] === v }, label)));
+  const chk = (key, label) => h("label", { class: "check" }, h("input", { type: "checkbox", checked: !!s[key],
+    onchange: e => saveSettings({ [key]: e.target.checked }) }), label);
+  const out = h("input", { class: "input sm", value: s.out, onchange: e => saveSettings({ out: e.target.value }).then(loadProjects) });
+  const more = h("div", { class: "more", hidden: !S.showMore },
+    h("div", { class: "field" }, h("label", {}, "Speech recognition model"),
+      sel("model", [["base", "base · fast, more typos"], ["small", "small · balanced (recommended)"],
+        ["medium", "medium · more accurate, ~2× slower"], ["large-v3", "large-v3 · most accurate, very slow"], ["turbo", "turbo · accurate, best with a GPU"]])),
+    h("div", { class: "field" }, h("label", {}, "Only process part of the video"),
+      h("input", { class: "input sm", placeholder: "e.g. 10:00-25:00 (empty = whole video)", value: s.section,
+        onchange: e => saveSettings({ section: e.target.value }) })),
+    h("div", { class: "field" }, h("label", {}, "Save clips to"),
+      h("div", { style: "display:flex;gap:8px" }, out, h("button", { class: "btn small", onclick: async () => {
+        const r = await api("/api/pick", { kind: "folder" }); if (r.path) { out.value = r.path; await saveSettings({ out: r.path }); loadProjects(); } } }, "Browse"))),
+    h("div", { class: "toggles" }, chk("captions", "Burn in captions"), chk("title", "Title at the top"),
+      chk("uppercase", "Uppercase captions"), chk("review", "Let me review moments before rendering"),
+      chk("force", "Start over (ignore saved results)")));
+  const page = h("div", {},
+    h("section", { class: "card hero" },
+      h("h1", {}, "Turn long videos into Shorts"),
+      h("p", {}, "ClipKit downloads the video, transcribes it, picks the best moments and renders captioned 9:16 clips. Free, on your computer."),
+      h("div", { class: "source-row" }, src,
+        h("button", { class: "btn big", onclick: async () => { const r = await api("/api/pick", { kind: "file" }); if (r.path) src.value = r.path; } }, "Browse"),
+        h("button", { class: "btn primary big", id: "findBtn", onclick: find }, "Find moments")),
+      h("div", { class: "opts" },
+        h("span", { class: "opt" }, h("b", {}, "Clips"), num("clips", 1, 30)),
+        h("span", { class: "opt" }, h("b", {}, "Length"), num("min_len", 5, 175, 5), "–", num("max_len", 10, 180, 5), "sec"),
+        h("span", { class: "opt" }, h("b", {}, "Frame"), segCtl("layout", [["blur", "Blurred bg"], ["crop", "Crop to fill"], ["fit", "Fit"]])),
+        h("span", { class: "opt" }, h("b", {}, "Language"), sel("language", [["", "Auto-detect"], ["vi", "Vietnamese"], ["en", "English"],
+          ["zh", "Chinese"], ["ja", "Japanese"], ["ko", "Korean"], ["th", "Thai"]])),
+        h("button", { class: "link", onclick: e => { S.showMore = !S.showMore; more.hidden = !S.showMore;
+          e.target.textContent = S.showMore ? "Fewer options" : "More options"; } }, S.showMore ? "Fewer options" : "More options")),
+      more,
+      h("div", { class: "card banner", id: "banner", hidden: true })),
+    h("div", { class: "section-head" }, h("h2", {}, "Projects"), h("span", { class: "count", id: "pcount" })),
+    h("div", { id: "projects" }));
+  setTimeout(() => { src.focus(); updateBanner(); }, 0);
+  return page;
+}
+async function find() {
+  const source = $("#source").value.trim();
+  if (!source) { toast("Paste a video link or choose a file first.", true); $("#source").focus(); return; }
+  await api("/api/find", { source, settings: S.settings });
+  S.waitingForProject = true;
+  updateBanner();
+}
+function updateBanner() {
+  const b = $("#banner"), st = S.state; if (!b) return;
+  const btn = $("#findBtn"); if (btn) btn.disabled = !!st.busy;
+  if (!st.busy) { b.hidden = true; return; }
+  b.hidden = false; b.innerHTML = "";
+  put(b, h("span", {}, st.project ? "Working on a project" : "Starting…"),
+    h("div", { class: "bar" }, h("i", { style: `width:${st.progress}%` })),
+    h("span", { class: "hint" }, Math.round(st.progress) + "%"),
+    st.project ? h("button", { class: "btn small", onclick: () => go("#/p/" + encodeURIComponent(st.project)) }, "Open") : null,
+    h("button", { class: "btn small danger", onclick: () => api("/api/stop", {}) }, "Stop"));
+}
+function renderProjects() {
+  const box = $("#projects"); if (!box) return;
+  $("#pcount").textContent = S.projects.length ? S.projects.length : "";
+  box.innerHTML = "";
+  if (!S.projects.length) { box.append(h("div", { class: "card empty" }, "No projects yet. Paste a link above to make your first clips.")); return; }
+  box.className = "grid";
+  for (const p of S.projects) {
+    box.append(h("div", { class: "card project", onclick: () => go("#/p/" + encodeURIComponent(p.id)) },
+      h("div", { class: "thumb", style: `background-image:url('${p.thumb}')` }, h("span", { class: "badge" }, tsShort(p.duration))),
+      h("div", { class: "body" },
+        h("div", { class: "title", title: p.title }, p.title),
+        h("div", { class: "meta" }, p.uploader ? h("span", {}, p.uploader) : null,
+          p.clips ? h("span", { class: "pill ok" }, plural(p.clips, "clip")) : p.moments ? h("span", { class: "pill accent" }, plural(p.moments, "moment")) : null,
+          isCC(p.license) ? h("span", { class: "pill" }, "CC BY") : null))));
+  }
+}
+
+// ---------- project
+function projectPage(pid) {
+  return h("div", {},
+    h("button", { class: "btn ghost small back", onclick: () => go("#/") }, "← All projects"),
+    h("div", { id: "phead" }, h("h1", {}, " ")),
+    h("section", { class: "card progress", id: "progress", hidden: true }),
+    h("div", { id: "moments" }, h("div", { class: "moments" }, [1, 2, 3, 4].map(() => h("div", { class: "skeleton" })))));
+}
+const STEP_NAMES = ["Download", "Transcribe", "Pick moments", "Render"];
+function updateProgress() {
+  const box = $("#progress"); if (!box) return;
+  const pid = decodeURIComponent(S.route.slice(4)), st = S.state;
+  const mine = st.project === pid || (S.waitingForProject && st.busy);
+  const show = mine && (st.busy || st.phase === "error" || st.phase === "stopped");
+  box.hidden = !show; if (!show) return;
+  const logOpen = S.showLog;
+  box.innerHTML = "";
+  put(box,
+    h("div", { class: "steps" }, STEP_NAMES.map((n, i) => {
+      const k = i + 1, cls = st.step > k || (st.step === k && !st.busy && st.phase !== "error" && st.phase !== "stopped") ? "done" : st.step === k ? "active" : "";
+      return h("div", { class: "step " + cls }, h("span", { class: "dot" }, cls === "done" ? "✓" : k), n);
+    })),
+    h("div", { class: "bar" }, h("i", { style: `width:${st.progress}%` })),
+    h("div", { class: "status-row" },
+      h("span", { class: "status", title: st.status }, st.status),
+      h("button", { class: "link", onclick: () => { S.showLog = !S.showLog; updateProgress(); } }, logOpen ? "Hide log" : "Show log"),
+      st.busy ? h("button", { class: "btn small danger", onclick: () => api("/api/stop", {}) }, "Stop") : null),
+    st.error ? h("div", { class: "error" }, st.error) : null,
+    logOpen ? h("pre", { class: "log" }, st.log.join("\n")) : null);
+  const pre = $("pre.log", box); if (pre) pre.scrollTop = pre.scrollHeight;
+}
+function renderMoments() {
+  const p = S.project, head = $("#phead"), box = $("#moments");
+  if (!head || !box) return;
+  updateProgress();
+  if (!p) { head.innerHTML = ""; head.append(h("h1", {}, S.state.busy ? "Getting the video…" : "Project not found"));
+    if (!S.state.busy) box.innerHTML = ""; return; }
+  const info = p.info;
+  head.innerHTML = "";
+  head.append(h("div", { class: "proj-head" }, h("div", { style: "flex:1" },
+    h("h1", {}, info.title || p.id),
+    h("div", { class: "meta" }, info.uploader ? h("span", {}, info.uploader) : null, info.duration ? h("span", {}, "· " + tsShort(info.duration)) : null,
+      info.license ? h("span", { class: "pill " + (isCC(info.license) ? "ok" : "warn"), title: info.license },
+        isCC(info.license) ? "Creative Commons: reuse with credit" : "Not Creative Commons: only post if you have the rights") : null,
+      info.url ? h("a", { href: info.url, target: "_blank", class: "link" }, "Source ↗") : null))));
+  const segs = p.segments;
+  box.innerHTML = "";
+  const st = S.state, working = st.busy && st.project === p.id;
+  if (!segs.length) {
+    box.append(working ? h("div", { class: "moments" }, [1, 2, 3, 4].map(() => h("div", { class: "skeleton" })))
+      : h("div", { class: "card empty" }, "No moments yet. Go back and press Find moments."));
+    return;
+  }
+  const on = segs.filter(s => s.enabled !== false).length, rendered = segs.filter(s => s.clip).length;
+  const s = S.settings;
+  const segCtl = h("div", { class: "seg", title: "Frame used when rendering" }, [["blur", "Blurred bg"], ["crop", "Crop"], ["fit", "Fit"]].map(([v, l]) =>
+    h("button", { class: s.layout === v ? "on" : "", onclick: async e => { await saveSettings({ layout: v });
+      [...e.target.parentNode.children].forEach(b => b.classList.toggle("on", b === e.target)); } }, l)));
+  box.append(h("div", { class: "toolbar" },
+    h("h2", {}, "Moments"), h("span", { class: "count" }, `${on} of ${segs.length} selected` + (rendered ? ` · ${rendered} rendered` : "")),
+    h("button", { class: "link", onclick: () => setAll(true) }, "All"), h("button", { class: "link", onclick: () => setAll(false) }, "None"),
+    h("div", { class: "spacer" }),
+    segCtl,
+    h("label", { class: "check" }, h("input", { type: "checkbox", checked: s.captions, onchange: e => saveSettings({ captions: e.target.checked }) }), "Captions"),
+    h("button", { class: "btn", onclick: () => api("/api/open", { id: p.id }) }, "Open folder"),
+    h("button", { class: "btn primary", disabled: st.busy || !on, onclick: renderClips }, rendered ? `Re-render ${plural(on, "clip")}` : `Render ${plural(on, "clip")}`)));
+  box.append(h("div", { class: "moments" }, segs.map((seg, i) => momentCard(p, seg, i, working))));
+}
+function momentCard(p, seg, i, working) {
+  const off = seg.enabled === false, dur = seg.end - seg.start;
+  const media = h("div", { class: "media" });
+  if (seg.clip) {
+    media.append(h("video", { src: seg.clip, poster: seg.cover || seg.thumb, controls: true, preload: "none", playsinline: true }));
+  } else {
+    media.append(h("div", { class: "blur", style: `background-image:url('${seg.thumb}')` }), h("img", { class: "fg", src: seg.thumb, alt: "" }),
+      h("span", { class: "badge state" }, working && S.state.phase === "rendering" && seg.enabled !== false ? "Rendering…" : "Preview"));
+  }
+  media.append(h("span", { class: "badge rank" }, "#" + (seg.rank || i + 1)), h("span", { class: "badge dur" }, Math.round(dur) + "s"));
+  if (!seg.clip) media.append(h("label", { class: "use" }, h("input", { type: "checkbox", checked: !off,
+    onchange: e => { seg.enabled = e.target.checked; card.classList.toggle("off", !seg.enabled); saveMoments(); renderCountsSoon(); } }), "Use"));
+  const start = h("input", { value: ts(seg.start), title: "Start (min:sec)" }), end = h("input", { value: ts(seg.end), title: "End (min:sec)" });
+  const applyTimes = () => {
+    const a = parseTs(start.value), b = parseTs(end.value);
+    if (!(b - a >= 1)) { toast("Times must look like 2:05.5 and the end must come after the start.", true); start.value = ts(seg.start); end.value = ts(seg.end); return; }
+    if (Math.abs(a - seg.start) < .05 && Math.abs(b - seg.end) < .05) return;
+    seg.start = +a.toFixed(2); seg.end = +b.toFixed(2); saveMoments(true);
+  };
+  start.addEventListener("change", applyTimes); end.addEventListener("change", applyTimes);
+  const title = h("textarea", { class: "title", rows: 2, value: seg.title || "", spellcheck: false,
+    onchange: e => { seg.title = e.target.value.trim(); saveMoments(); } });
+  const card = h("div", { class: "card moment" + (off ? " off" : "") }, media,
+    h("div", { class: "body" }, title,
+      h("div", { class: "times" }, start, "→", end),
+      seg.reasons && seg.reasons.length ? h("div", { class: "chips" }, seg.reasons.map(r => h("span", { class: "pill" + (/penalty/.test(r) ? " warn" : "") }, r))) : null,
+      seg.text ? h("div", { class: "excerpt", onclick: e => e.target.classList.toggle("open") }, seg.text) : null,
+      h("div", { class: "actions" },
+        h("button", { class: "btn small", onclick: () => copyText(p, seg) }, "Copy title & description"),
+        seg.clip ? h("button", { class: "btn small", onclick: () => api("/api/open", { id: p.id, file: seg.clip_name }) }, "Show file") : null,
+        seg.clip ? h("label", { class: "check", style: "margin-left:auto;font-size:12.5px" }, h("input", { type: "checkbox", checked: !off,
+          onchange: e => { seg.enabled = e.target.checked; card.classList.toggle("off", !seg.enabled); saveMoments(); renderCountsSoon(); } }), "Use") : null)));
+  return card;
+}
+function renderCountsSoon() { clearTimeout(renderCountsSoon.t); renderCountsSoon.t = setTimeout(renderMoments, 250); }
+function setAll(v) { S.project.segments.forEach(s => s.enabled = v); saveMoments(); renderMoments(); }
+function saveMoments(reload) {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    await api("/api/segments", { id: S.project.id, segments: S.project.segments });
+    if (reload) loadProject(S.project.id);
+  }, reload ? 0 : 300);
+}
+async function renderClips() {
+  clearTimeout(saveTimer);
+  await api("/api/render", { id: S.project.id, segments: S.project.segments, settings: S.settings });
+  S.state.busy = true; S.state.project = S.project.id; S.state.phase = "rendering";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  renderMoments();
+}
+function copyText(p, seg) {
+  const i = p.info, text = (seg.text || "").length > 280 ? seg.text.slice(0, 280).replace(/\s+\S*$/, "") + "…" : (seg.text || "");
+  const credit = i.url ? `\n\nSource: ${i.title} - ${i.uploader}\n${i.url}` + (i.license ? `\nLicense: ${i.license}` : "") : "";
+  navigator.clipboard.writeText(`${seg.title}\n\n${text}${credit}`).then(() => toast("Copied title, description and source credit."));
+}
+
+// ---------- start
+window.addEventListener("pagehide", () => navigator.sendBeacon("/api/bye", "{}"));
+(async () => {
+  await loadSettings();
+  await poll();
+  render();
+  pollTimer = setInterval(poll, 800);
+})();
+</script>
+</body>
+</html>

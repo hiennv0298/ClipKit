@@ -1,12 +1,10 @@
-"""Command line: `clipkit run <link|file>`, `clipkit render <folder>`, `clipkit doctor`.
+"""Command line: `clipkit run <link|file>`, `clipkit render <folder>`, `clipkit gui`, `clipkit doctor`.
 
-Started with no arguments (e.g. double-clicking ClipKit.exe) it asks a few
-questions instead.
+Started with no arguments it opens the app window (a local page served on 127.0.0.1).
 """
 from __future__ import annotations
 
 import argparse
-import os
 import platform
 import sys
 import traceback
@@ -20,48 +18,52 @@ from clipkit.util import ClipKitError, app_home, default_output_dir, log, parse_
 
 def _add_common(p: argparse.ArgumentParser) -> None:
     p.add_argument("--layout", choices=LAYOUTS, default="blur",
-                   help="blur: video giữa + nền mờ (mặc định) · crop: cắt đầy khung 9:16 · fit: viền đen")
-    p.add_argument("--crop-x", type=float, default=0.5, help="với --layout crop: vị trí cắt ngang 0 (trái) … 1 (phải)")
-    p.add_argument("--no-captions", action="store_true", help="không chèn phụ đề vào video")
-    p.add_argument("--no-title", action="store_true", help="không chèn tiêu đề ở đầu khung")
-    p.add_argument("--uppercase", action="store_true", help="phụ đề viết hoa")
+                   help="blur: video centered on a blurred background (default), crop: fill the 9:16 frame, "
+                        "fit: black bars")
+    p.add_argument("--crop-x", type=float, default=0.5,
+                   help="with --layout crop: horizontal crop position, 0 (left) to 1 (right)")
+    p.add_argument("--no-captions", action="store_true", help="do not burn captions into the video")
+    p.add_argument("--no-title", action="store_true", help="do not add the title at the top of the frame")
+    p.add_argument("--uppercase", action="store_true", help="uppercase captions")
     p.add_argument("--encoder", choices=("auto", "cpu", "nvenc"), default="auto",
-                   help="auto: dùng GPU NVIDIA nếu có (nhanh hơn nhiều)")
+                   help="auto: use the NVIDIA GPU when available (much faster)")
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="clipkit",
-        description="Cắt video dài thành clip ngắn 9:16 có phụ đề (yt-dlp + Whisper + FFmpeg). Không cần API key.",
+        description="Cut long videos into captioned 9:16 short clips (yt-dlp + Whisper + FFmpeg). "
+                    "No API key needed. Run without arguments to open the app window.",
     )
     parser.add_argument("--version", action="version", version=f"clipkit {__version__}")
     sub = parser.add_subparsers(dest="command")
 
-    run = sub.add_parser("run", help="tải, tạo phụ đề, chọn đoạn và dựng clip")
-    run.add_argument("source", help="link YouTube/TikTok/Facebook… (mọi trang yt-dlp hỗ trợ) hoặc đường dẫn file video")
-    run.add_argument("-n", "--clips", type=int, default=5, help="số clip muốn tạo (mặc định 5)")
-    run.add_argument("--min", dest="min_len", type=float, default=20, help="độ dài tối thiểu mỗi clip, giây (20)")
-    run.add_argument("--max", dest="max_len", type=float, default=60, help="độ dài tối đa mỗi clip, giây (60)")
+    run = sub.add_parser("run", help="download, transcribe, pick moments and render clips")
+    run.add_argument("source", help="a YouTube/TikTok/Facebook... link (any site yt-dlp supports) or a video file")
+    run.add_argument("-n", "--clips", type=int, default=5, help="number of clips (default 5)")
+    run.add_argument("--min", dest="min_len", type=float, default=20, help="minimum clip length in seconds (20)")
+    run.add_argument("--max", dest="max_len", type=float, default=60, help="maximum clip length in seconds (60)")
     run.add_argument("--model", default="small",
-                     help="model Whisper: tiny, base, small (mặc định), medium, large-v3, turbo")
-    run.add_argument("--language", default=None, help="mã ngôn ngữ, ví dụ vi hoặc en (mặc định: tự nhận)")
-    run.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto", help="chạy Whisper trên CPU hay GPU")
-    run.add_argument("--section", help="chỉ xử lý một khúc, ví dụ 10:00-25:00")
+                     help="Whisper model: tiny, base, small (default), medium, large-v3, turbo")
+    run.add_argument("--language", default=None, help="language code such as vi or en (default: auto-detect)")
+    run.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto", help="run Whisper on CPU or GPU")
+    run.add_argument("--section", help="only process part of the video, e.g. 10:00-25:00")
     run.add_argument("--selector", choices=("heuristic", "llm"), default="heuristic",
-                     help="heuristic: tự chấm điểm, không tốn token (mặc định) · llm: hỏi model qua API")
-    run.add_argument("--max-height", type=int, default=1080, help="độ phân giải tải về tối đa (1080)")
+                     help="heuristic: local scoring, no tokens (default); llm: ask a model through an API")
+    run.add_argument("--max-height", type=int, default=1080, help="maximum download resolution (1080)")
     run.add_argument("--cookies-from-browser", choices=("chrome", "edge", "firefox", "brave"),
-                     help="dùng cookie trình duyệt khi trang bắt đăng nhập")
-    run.add_argument("-o", "--out", type=Path, default=default_output_dir(), help="thư mục kết quả")
-    run.add_argument("--force", action="store_true", help="làm lại từ đầu, bỏ qua kết quả đã lưu")
-    run.add_argument("--keep-audio", action="store_true", help="giữ file audio.wav")
+                     help="use your browser's cookies when the site requires login")
+    run.add_argument("-o", "--out", type=Path, default=default_output_dir(), help="output folder")
+    run.add_argument("--force", action="store_true", help="start over, ignore saved results")
+    run.add_argument("--keep-audio", action="store_true", help="keep the extracted audio.wav")
     _add_common(run)
 
-    render = sub.add_parser("render", help="dựng lại clip từ segments.json (sau khi bạn sửa tay)")
-    render.add_argument("workdir", type=Path, help="thư mục video, nơi có segments.json")
+    render = sub.add_parser("render", help="re-render clips from segments.json (after editing it)")
+    render.add_argument("workdir", type=Path, help="the video's work folder, containing segments.json")
     _add_common(render)
 
-    sub.add_parser("doctor", help="kiểm tra FFmpeg, GPU và nơi lưu model")
+    sub.add_parser("gui", help="open the app window")
+    sub.add_parser("doctor", help="check FFmpeg, GPU and where models are stored")
     return parser
 
 
@@ -72,10 +74,14 @@ def _options(args: argparse.Namespace, **extra) -> Options:
 
 def cmd_run(args: argparse.Namespace) -> None:
     if args.min_len >= args.max_len:
-        raise ClipKitError("--min phải nhỏ hơn --max.")
+        raise ClipKitError("--min must be smaller than --max.")
+    try:
+        section = parse_section(args.section)
+    except ValueError as exc:
+        raise ClipKitError(f"--section: {exc}") from exc
     opts = _options(
         args, clips=args.clips, min_len=args.min_len, max_len=args.max_len, model=args.model,
-        language=args.language, device=args.device, section=parse_section(args.section),
+        language=args.language, device=args.device, section=section,
         selector=args.selector, max_height=args.max_height, out=args.out, force=args.force,
         keep_audio=args.keep_audio, cookies_from_browser=args.cookies_from_browser,
     )
@@ -87,55 +93,46 @@ def cmd_render(args: argparse.Namespace) -> None:
 
     workdir = args.workdir.expanduser().resolve()
     if not (workdir / "segments.json").exists():
-        raise ClipKitError(f"Không thấy segments.json trong {workdir}")
+        raise ClipKitError(f"No segments.json in {workdir}")
     render_all(workdir, find_ffmpeg(), _options(args))
-    log(f"Xong. Clip ở: {workdir / 'clips'}")
+    log(f"Done. Clips are in: {workdir / 'clips'}")
 
 
 def cmd_doctor() -> None:
     from clipkit.deps import cuda_devices, find_ffmpeg, nvenc_available
-
-    log(f"ClipKit {__version__} · Python {platform.python_version()} · {platform.system()} {platform.release()}")
-    ff = find_ffmpeg()
-    log(f"FFmpeg: {ff.ffmpeg}")
-    log(f"Mã hóa bằng GPU NVIDIA (NVENC): {'có' if nvenc_available(ff.ffmpeg) else 'không'}")
     from clipkit.transcribe import cuda_marker
 
+    log(f"ClipKit {__version__} - Python {platform.python_version()} - {platform.system()} {platform.release()}")
+    ff = find_ffmpeg()
+    log(f"FFmpeg: {ff.ffmpeg}")
+    log(f"NVIDIA GPU encoding (NVENC): {'yes' if nvenc_available(ff.ffmpeg) else 'no'}")
     if not cuda_devices():
-        gpu = "không, sẽ chạy CPU"
+        gpu = "no, using CPU"
     elif cuda_marker().exists():
-        gpu = (f"có GPU nhưng lần trước thiếu thư viện CUDA nên dùng CPU "
-               f"(xóa {cuda_marker()} để thử lại)")
+        gpu = f"GPU found, but CUDA libraries were missing last time so CPU is used (delete {cuda_marker()} to retry)"
     else:
-        gpu = "có"
-    log(f"Whisper trên GPU (CUDA): {gpu}")
+        gpu = "yes"
+    log(f"Whisper on GPU (CUDA): {gpu}")
     import yt_dlp
+
     log(f"yt-dlp: {yt_dlp.version.__version__}")
-    log(f"Model và công cụ lưu ở: {app_home()}")
-    log(f"Clip mặc định lưu ở: {default_output_dir()}")
+    log(f"Models and tools are stored in: {app_home()}")
+    log(f"Clips are saved to: {default_output_dir()}")
 
 
-def interactive() -> None:
-    log(f"ClipKit {__version__} — cắt video dài thành clip ngắn có phụ đề\n")
-    source = input("Dán link video hoặc kéo thả file video vào đây rồi Enter:\n> ").strip().strip('"')
-    if not source:
-        return
-    n = input("Số clip muốn tạo [5]: ").strip()
-    layout = input("Kiểu khung: 1 = video giữa nền mờ, 2 = cắt đầy khung [1]: ").strip()
-    lang = input("Ngôn ngữ video (vi, en… để trống = tự nhận): ").strip() or None
-    opts = Options(clips=int(n) if n.isdigit() else 5, layout="crop" if layout == "2" else "blur", language=lang)
-    workdir = run_all(source, opts)
-    if os.name == "nt":
-        os.startfile(workdir / "clips")  # noqa: S606 - open the result folder for the user
+def cmd_gui() -> None:
+    """Start the local app server and open its window."""
+    from clipkit.gui import main as gui_main
+
+    gui_main()
 
 
 def main(argv: list[str] | None = None) -> int:
     setup_console()
     argv = sys.argv[1:] if argv is None else argv
-    double_clicked = not argv
     try:
-        if double_clicked:
-            interactive()
+        if not argv or argv == ["gui"]:
+            cmd_gui()
         else:
             args = build_parser().parse_args(argv)
             if args.command == "run":
@@ -148,14 +145,12 @@ def main(argv: list[str] | None = None) -> int:
                 build_parser().print_help()
         code = 0
     except ClipKitError as exc:
-        log(f"\nLỖI: {exc}")
+        log(f"\nERROR: {exc}")
         code = 1
     except KeyboardInterrupt:
-        log("\nĐã dừng.")
+        log("\nStopped.")
         code = 130
     except Exception:  # noqa: BLE001 - show the trace, never just close the window
         traceback.print_exc()
         code = 1
-    if double_clicked and getattr(sys, "frozen", False):
-        input("\nNhấn Enter để đóng…")
     return code

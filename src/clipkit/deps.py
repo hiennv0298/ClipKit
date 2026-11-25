@@ -59,15 +59,15 @@ def find_ffmpeg(auto_download: bool = True) -> FFmpeg:
     if auto_download and os.name == "nt":
         return _download_ffmpeg()
     raise ClipKitError(
-        "Không tìm thấy FFmpeg. Cài FFmpeg rồi chạy lại "
-        "(Windows: winget install Gyan.FFmpeg · macOS: brew install ffmpeg · Linux: apt install ffmpeg)."
+        "FFmpeg not found. Install it and try again "
+        "(Windows: winget install Gyan.FFmpeg, macOS: brew install ffmpeg, Linux: apt install ffmpeg)."
     )
 
 
 def _download_ffmpeg() -> FFmpeg:
     target = app_home() / "ffmpeg"
     archive = app_home() / "ffmpeg-download.zip"
-    log("Chưa có FFmpeg, đang tải bản build của gyan.dev (khoảng 100 MB, chỉ một lần)…")
+    log("FFmpeg not found, downloading the gyan.dev build (about 100 MB, one time only)...")
     try:
         expected = urllib.request.urlopen(FFMPEG_SHA_URL, timeout=30).read().decode().split()[0].lower()
         with urllib.request.urlopen(FFMPEG_ZIP_URL, timeout=60) as resp, open(archive, "wb") as out:
@@ -76,10 +76,10 @@ def _download_ffmpeg() -> FFmpeg:
                 digest.update(chunk)
                 out.write(chunk)
     except OSError as exc:
-        raise ClipKitError(f"Tải FFmpeg thất bại: {exc}. Hãy cài thủ công: winget install Gyan.FFmpeg") from exc
+        raise ClipKitError(f"FFmpeg download failed: {exc}. Install it manually: winget install Gyan.FFmpeg") from exc
     if digest.hexdigest() != expected:
         archive.unlink(missing_ok=True)
-        raise ClipKitError("File FFmpeg tải về không khớp mã SHA-256, đã hủy để an toàn.")
+        raise ClipKitError("Downloaded FFmpeg does not match its SHA-256 checksum; discarded for safety.")
     shutil.rmtree(target, ignore_errors=True)
     (target / "bin").mkdir(parents=True)
     with zipfile.ZipFile(archive) as zf:
@@ -90,8 +90,8 @@ def _download_ffmpeg() -> FFmpeg:
     archive.unlink(missing_ok=True)
     found = _pair(target / "bin")
     if not found:
-        raise ClipKitError("Giải nén FFmpeg thất bại: không thấy ffmpeg.exe trong file tải về.")
-    log(f"Đã cài FFmpeg vào {found.folder}")
+        raise ClipKitError("Could not extract FFmpeg: ffmpeg.exe not found in the download.")
+    log(f"FFmpeg installed to {found.folder}")
     return found
 
 

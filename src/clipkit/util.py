@@ -6,13 +6,44 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import unicodedata
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 
 class ClipKitError(RuntimeError):
     """An error we can explain to the user without a traceback."""
+
+
+class Cancelled(ClipKitError):
+    """The user pressed Stop."""
+
+    def __init__(self, message: str = "Stopped by user.") -> None:
+        super().__init__(message)
+
+
+_cancel = threading.Event()
+_log_sinks: list[Callable[[str], None]] = []
+
+
+def request_cancel() -> None:
+    _cancel.set()
+
+
+def reset_cancel() -> None:
+    _cancel.clear()
+
+
+def check_cancel() -> None:
+    """Raise Cancelled if Stop was pressed; long steps call this regularly."""
+    if _cancel.is_set():
+        raise Cancelled()
+
+
+def add_log_sink(sink: Callable[[str], None]) -> None:
+    """Also send every log line to `sink` (the GUI uses this)."""
+    _log_sinks.append(sink)
 
 
 def app_home() -> Path:
@@ -34,7 +65,12 @@ def default_output_dir() -> Path:
 
 
 def log(message: str = "") -> None:
-    print(message, flush=True)
+    try:
+        print(message, flush=True)
+    except (AttributeError, OSError, ValueError):
+        pass  # no console (e.g. started without one)
+    for sink in _log_sinks:
+        sink(message)
 
 
 def fmt_ts(seconds: float) -> str:
@@ -63,11 +99,11 @@ def parse_section(value: str | None) -> tuple[float, float] | None:
     if not value:
         return None
     if "-" not in value:
-        raise ValueError("section phải có dạng BẮT_ĐẦU-KẾT_THÚC, ví dụ 10:00-25:00")
+        raise ValueError("section must look like START-END, e.g. 10:00-25:00")
     start_s, end_s = value.split("-", 1)
     start, end = parse_ts(start_s), parse_ts(end_s)
     if end <= start:
-        raise ValueError("thời điểm kết thúc phải lớn hơn thời điểm bắt đầu")
+        raise ValueError("the end time must be after the start time")
     return start, end
 
 
@@ -89,24 +125,39 @@ def read_json(path: Path) -> Any:
 
 
 def run(cmd: Sequence[str], cwd: Path | None = None) -> subprocess.CompletedProcess:
-    """Run a command, raising ClipKitError with the tail of stderr on failure."""
-    proc = subprocess.run(
-        list(map(str, cmd)),
+    """Run a command, raising ClipKitError with the tail of stderr on failure.
+
+    Stop (request_cancel) kills the command instead of waiting for it.
+    """
+    args = list(map(str, cmd))
+    proc = subprocess.Popen(
+        args,
         cwd=str(cwd) if cwd else None,
-        capture_output=True,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
         encoding="utf-8",
         errors="replace",
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
+    while True:
+        try:
+            out, err = proc.communicate(timeout=0.3)
+            break
+        except subprocess.TimeoutExpired:
+            if _cancel.is_set():
+                proc.kill()
+                proc.communicate()
+                raise Cancelled() from None
     if proc.returncode != 0:
-        tail = "\n".join((proc.stderr or proc.stdout or "").strip().splitlines()[-15:])
-        raise ClipKitError(f"Lệnh thất bại ({Path(str(cmd[0])).name}):\n{tail}")
-    return proc
+        tail = "\n".join((err or out or "").strip().splitlines()[-15:])
+        raise ClipKitError(f"Command failed ({Path(args[0]).name}):\n{tail}")
+    return subprocess.CompletedProcess(args, proc.returncode, out, err)
 
 
 def setup_console() -> None:
-    """Make Vietnamese text print correctly on the Windows console."""
+    """Make non-ASCII text (e.g. Vietnamese titles) print correctly on the Windows console."""
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(encoding="utf-8", errors="replace")

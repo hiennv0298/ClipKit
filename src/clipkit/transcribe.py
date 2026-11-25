@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 
 from clipkit.deps import FFmpeg, cuda_devices
-from clipkit.util import ClipKitError, app_home, fmt_ts, log, run, write_json
+from clipkit.util import Cancelled, ClipKitError, app_home, check_cancel, fmt_ts, log, run, write_json
 
 SAMPLE_RATE = 16000
 ENERGY_STEP = 0.5  # seconds per loudness sample
@@ -50,7 +50,7 @@ def _load_model(name: str, device: str):
 
     compute = "float16" if device == "cuda" else "int8"
     models = app_home() / "whisper-models"
-    log(f"Đang nạp Whisper '{name}' trên {device.upper()} (lần đầu sẽ tự tải model)…")
+    log(f"Loading Whisper '{name}' on {device.upper()} (the model is downloaded on first use)...")
     return WhisperModel(name, device=device, compute_type=compute, download_root=str(models))
 
 
@@ -68,6 +68,7 @@ def _run_whisper(model, wav: Path, language: str | None, total: float, offset: f
     out: list[dict] = []
     last_report = time.monotonic()
     for seg in segments_iter:
+        check_cancel()
         words = [
             {"start": round(w.start + offset, 3), "end": round(w.end + offset, 3), "word": w.word.strip()}
             for w in (seg.words or []) if w.word.strip()
@@ -80,7 +81,7 @@ def _run_whisper(model, wav: Path, language: str | None, total: float, offset: f
         })
         if time.monotonic() - last_report > 15 and total:
             last_report = time.monotonic()
-            log(f"  phụ đề {min(100, int(seg.end * 100 / total))}% ({fmt_ts(seg.end)} / {fmt_ts(total)})")
+            log(f"  transcribed {min(100, int(seg.end * 100 / total))}% ({fmt_ts(seg.end)} / {fmt_ts(total)})")
     return out, info.language
 
 
@@ -96,15 +97,17 @@ def transcribe(wav: Path, model_name: str, language: str | None, device: str, of
     started = time.monotonic()
     try:
         segments, lang = _run_whisper(_load_model(model_name, device), wav, language, total, offset)
+    except Cancelled:
+        raise
     except Exception as exc:  # noqa: BLE001 - CUDA libs missing shows up here at runtime
         if device != "cuda":
-            raise ClipKitError(f"Whisper lỗi: {exc}") from exc
-        log(f"  GPU không chạy được Whisper ({exc.__class__.__name__}: thiếu thư viện CUDA?), chuyển sang CPU…")
+            raise ClipKitError(f"Whisper failed: {exc}") from exc
+        log(f"  Whisper could not run on the GPU ({exc.__class__.__name__}: CUDA libraries missing?), switching to CPU...")
         cuda_marker().write_text(str(exc)[:500], encoding="utf-8")
         device = "cpu"
         segments, lang = _run_whisper(_load_model(model_name, device), wav, language, total, offset)
     took = time.monotonic() - started
-    log(f"  Xong phụ đề: {len(segments)} đoạn, ngôn ngữ '{lang}', mất {fmt_ts(took)}.")
+    log(f"  Transcript done: {len(segments)} segments, language '{lang}', took {fmt_ts(took)}.")
     return {"language": lang, "model": model_name, "device": device, "segments": segments}
 
 

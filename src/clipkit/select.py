@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 HOOK_WORDS = [
-    # Tiếng Việt
+    # Vietnamese
     "tại sao", "vì sao", "bí mật", "sự thật", "sai lầm", "quan trọng nhất", "đừng", "không ai",
     "ít ai", "điều gì", "làm sao", "làm thế nào", "bài học", "thất bại", "thành công", "tiền",
     "triệu", "tỷ", "thực ra", "thật ra", "hóa ra", "bạn có biết", "câu chuyện", "duy nhất",
@@ -95,18 +95,18 @@ def hook_features(units: list[Unit]) -> tuple[float, list[str]]:
     score, reasons = 0.0, []
     if "?" in first:
         score += 0.8
-        reasons.append("mở bằng câu hỏi")
+        reasons.append("opens with a question")
     hits = [w for w in HOOK_WORDS if f" {w} " in opening]
     if hits:
         score += min(1.0, 0.5 * len(hits))
-        reasons.append("từ khóa: " + ", ".join(hits[:3]))
+        reasons.append("keywords: " + ", ".join(hits[:3]))
     if re.search(r"\d", first):
         score += 0.3
-        reasons.append("có con số")
+        reasons.append("has a number")
     start_norm = _norm(first).strip()
     if any(start_norm == w or start_norm.startswith(w + " ") for w in WEAK_STARTS):
         score -= 1.0
-        reasons.append("mở đầu bằng từ nối (trừ điểm)")
+        reasons.append("starts with a connective (penalty)")
     if units[0].n_words <= 2:
         score -= 0.3
     return score, reasons
@@ -178,9 +178,9 @@ def pick_segments(transcript: dict, count: int = 5, min_len: float = 20.0, max_l
                  + hook + (0.4 if ends_clean else -0.4)
                  - 0.6 * abs(c["dur"] - target) / max(1.0, max_len - min_len))
         if z_density[k] > 1:
-            reasons.append("nói nhanh, nhiều thông tin")
+            reasons.append("fast, dense speech")
         if z_energy[k] > 1:
-            reasons.append("âm lượng cao hơn trung bình")
+            reasons.append("louder than average")
         c.update(score=float(score), reasons=reasons, units=window)
 
     chosen: list[dict] = []

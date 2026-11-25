@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 from clipkit.deps import FFmpeg
-from clipkit.util import ClipKitError, log, read_json, run, slugify, write_json
+from clipkit.util import ClipKitError, check_cancel, log, read_json, run, slugify, write_json
 
 VIDEO_EXTS = {".mp4", ".mkv", ".webm", ".mov", ".m4v", ".avi"}
 
@@ -21,7 +21,7 @@ def probe(ff: FFmpeg, path: Path) -> dict:
     video = next((s for s in data.get("streams", []) if s.get("codec_type") == "video"), None)
     audio = next((s for s in data.get("streams", []) if s.get("codec_type") == "audio"), None)
     if not audio:
-        raise ClipKitError(f"Video không có âm thanh, không tạo phụ đề được: {path}")
+        raise ClipKitError(f"The video has no audio track, so it cannot be transcribed: {path}")
     return {
         "duration": float(data.get("format", {}).get("duration") or 0),
         "width": int(video["width"]) if video else 0,
@@ -33,8 +33,12 @@ def lookup(source: str) -> dict:
     """Read title/licence of a link without downloading it."""
     import yt_dlp
 
-    with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "skip_download": True}) as ydl:
-        info = ydl.extract_info(source, download=False)
+    try:
+        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "skip_download": True}) as ydl:
+            info = ydl.extract_info(source, download=False)
+    except yt_dlp.utils.DownloadError as exc:
+        reason = re.sub(r"^ERROR:\s*", "", str(exc)).strip()
+        raise ClipKitError(f"Could not open this link. {reason}") from None
     return {
         "id": info.get("id"),
         "title": info.get("title") or "video",
@@ -64,21 +68,22 @@ def fetch(source: str, out_root: Path, ff: FFmpeg, max_height: int = 1080,
     info_path = workdir / "info.json"
     existing = _existing_source(workdir)
     if existing and info_path.exists():
-        log(f"Đã có video tải trước đó: {existing.name}")
+        log(f"Using the previously downloaded video: {existing.name}")
         return workdir
 
-    log(f"Đang tải: {meta['title']} ({meta['uploader']})")
+    log(f"Downloading: {meta['title']} ({meta['uploader']})")
     _warn_license(meta)
     last_pct = [-10]
 
     def hook(d: dict) -> None:
+        check_cancel()
         if d.get("status") == "downloading":
             total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
             if total:
                 pct = int(d.get("downloaded_bytes", 0) * 100 / total)
                 if pct >= last_pct[0] + 10:
                     last_pct[0] = pct
-                    log(f"  tải {pct}%")
+                    log(f"  downloaded {pct}%")
 
     opts = {
         "outtmpl": str(workdir / "source.%(ext)s"),
@@ -97,11 +102,12 @@ def fetch(source: str, out_root: Path, ff: FFmpeg, max_height: int = 1080,
         with yt_dlp.YoutubeDL(opts) as ydl:
             ydl.download([source])
     except yt_dlp.utils.DownloadError as exc:
-        raise ClipKitError(f"yt-dlp không tải được video: {exc}") from exc
+        check_cancel()
+        raise ClipKitError(f"yt-dlp could not download the video: {exc}") from exc
 
     video = _existing_source(workdir)
     if not video:
-        raise ClipKitError("yt-dlp chạy xong nhưng không thấy file video.")
+        raise ClipKitError("yt-dlp finished but no video file was found.")
     meta.update(probe(ff, video), source_file=video.name)
     write_json(info_path, meta)
     return workdir
@@ -109,7 +115,7 @@ def fetch(source: str, out_root: Path, ff: FFmpeg, max_height: int = 1080,
 
 def _register_local(path: Path, out_root: Path, ff: FFmpeg) -> Path:
     if not path.is_file():
-        raise ClipKitError(f"Không thấy file: {path}")
+        raise ClipKitError(f"File not found: {path}")
     workdir = out_root / slugify(path.stem)
     workdir.mkdir(parents=True, exist_ok=True)
     info_path = workdir / "info.json"
@@ -134,14 +140,14 @@ def source_video(workdir: Path) -> Path:
         return Path(info["source_path"])
     video = _existing_source(workdir)
     if not video:
-        raise ClipKitError(f"Thư mục {workdir} chưa có video nguồn.")
+        raise ClipKitError(f"No source video in {workdir}.")
     return video
 
 
 def _warn_license(meta: dict) -> None:
     lic = meta.get("license") or ""
     if "creative commons" in lic.lower():
-        log(f"  Giấy phép: {lic} — được dùng lại, nhớ ghi nguồn (ClipKit tự ghi vào upload.txt).")
+        log(f"  License: {lic}. Reuse is allowed with credit (ClipKit writes it to upload.txt).")
     else:
-        log("  CẢNH BÁO: video này không có giấy phép Creative Commons. Chỉ đăng clip khi bạn có quyền,"
-            " nếu không có thể bị gỡ hoặc mất kiếm tiền.")
+        log("  WARNING: this video is not Creative Commons licensed. Only publish clips if you have the rights,"
+            " otherwise they may be taken down or demonetized.")

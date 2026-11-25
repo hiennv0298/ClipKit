@@ -18,13 +18,13 @@ import urllib.request
 from clipkit.select import build_units, to_segment
 from clipkit.util import ClipKitError, log
 
-PROMPT = """Bạn là biên tập viên video ngắn. Dưới đây là bản ghi một video, mỗi dòng là [giây_bắt_đầu] câu nói.
-Chọn {count} đoạn hay nhất để làm video ngắn dọc, mỗi đoạn dài {min_len:.0f}-{max_len:.0f} giây, không chồng lấn,
-mỗi đoạn phải là một ý trọn vẹn và câu đầu tiên phải gây tò mò.
-Trả về DUY NHẤT một mảng JSON, không giải thích:
-[{{"start": <giây bắt đầu, lấy đúng số trong ngoặc>, "end": <giây kết thúc>, "title": "<tiêu đề hấp dẫn, cùng ngôn ngữ với video, tối đa 70 ký tự>"}}]
+PROMPT = """You are a short-form video editor. Below is a video transcript, one sentence per line as [start_seconds] text.
+Pick the {count} best moments for vertical short videos, each {min_len:.0f}-{max_len:.0f} seconds long, not overlapping.
+Each moment must be one complete idea, and its first sentence must make viewers curious.
+Return ONLY a JSON array, no explanation:
+[{{"start": <start seconds, copied exactly from the brackets>, "end": <end seconds>, "title": "<catchy title in the same language as the video, max 70 characters>"}}]
 
-BẢN GHI:
+TRANSCRIPT:
 {transcript}"""
 
 
@@ -33,7 +33,7 @@ def _config() -> tuple[str, str, str]:
     key = os.environ.get("CLIPKIT_LLM_API_KEY", "")
     model = os.environ.get("CLIPKIT_LLM_MODEL", "")
     if not (base and key and model):
-        raise ClipKitError("--selector llm cần đặt CLIPKIT_LLM_BASE_URL, CLIPKIT_LLM_API_KEY và CLIPKIT_LLM_MODEL.")
+        raise ClipKitError("--selector llm needs CLIPKIT_LLM_BASE_URL, CLIPKIT_LLM_API_KEY and CLIPKIT_LLM_MODEL to be set.")
     return base, key, model
 
 
@@ -54,21 +54,21 @@ def pick_segments_llm(transcript: dict, count: int, min_len: float, max_len: flo
         f"{base}/chat/completions", data=json.dumps(body).encode(),
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"},
     )
-    log(f"Đang hỏi {model} chọn đoạn…")
+    log(f"Asking {model} to pick moments...")
     try:
         with urllib.request.urlopen(req, timeout=300) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        raise ClipKitError(f"LLM trả lỗi HTTP {exc.code}: {exc.read().decode('utf-8', 'replace')[:300]}") from exc
+        raise ClipKitError(f"LLM returned HTTP {exc.code}: {exc.read().decode('utf-8', 'replace')[:300]}") from exc
     except OSError as exc:
-        raise ClipKitError(f"Không gọi được LLM: {exc}") from exc
+        raise ClipKitError(f"Could not reach the LLM: {exc}") from exc
     usage = data.get("usage") or {}
     if usage:
-        log(f"  Token đã dùng: {usage.get('prompt_tokens')} vào + {usage.get('completion_tokens')} ra")
+        log(f"  Tokens used: {usage.get('prompt_tokens')} in + {usage.get('completion_tokens')} out")
     content = data["choices"][0]["message"].get("content") or ""
     match = re.search(r"\[.*\]", content, re.S)
     if not match:
-        raise ClipKitError("LLM không trả về JSON hợp lệ.")
+        raise ClipKitError("The LLM did not return valid JSON.")
     picks = json.loads(match.group(0))
 
     out: list[dict] = []
@@ -87,5 +87,5 @@ def pick_segments_llm(transcript: dict, count: int, min_len: float, max_len: flo
         if any(not (e <= o["start"] or s >= o["end"]) for o in out):
             continue
         out.append(to_segment(len(out) + 1, s, e, window, title=str(item.get("title") or "") or None,
-                              reasons=["chọn bởi LLM"]))
+                              reasons=["picked by LLM"]))
     return out[:count]
