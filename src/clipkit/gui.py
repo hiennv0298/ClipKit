@@ -39,7 +39,7 @@ SERVER: ThreadingHTTPServer | None = None
 IDLE_EXIT = 150  # quit after this many seconds without the page (never while working)
 SEGMENT_KEYS = ("rank", "start", "end", "title", "score", "reasons", "text", "enabled")
 MEDIA_TYPES = {".mp4": "video/mp4", ".m4v": "video/mp4", ".mov": "video/quicktime", ".webm": "video/webm",
-               ".mkv": "video/x-matroska", ".jpg": "image/jpeg", ".png": "image/png",
+               ".mkv": "video/x-matroska", ".jpg": "image/jpeg", ".png": "image/png", ".ico": "image/x-icon",
                ".srt": "text/plain; charset=utf-8", ".txt": "text/plain; charset=utf-8"}
 
 
@@ -457,6 +457,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path in ("/", "/index.html"):
                 return self._index()
+            if path in ("/icon-32.png", "/icon-192.png", "/icon-512.png", "/favicon.ico"):
+                return self._serve_file(WEBUI / ("clipkit.ico" if path == "/favicon.ico" else path[1:]))
             if path == "/__demo.js" and _demo_script():
                 return self._send(200, _demo_script().encode("utf-8"), "text/javascript; charset=utf-8")
             if path == "/api/ping":

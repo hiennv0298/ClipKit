@@ -2,7 +2,7 @@
 ; Installs per user (no admin) into %LOCALAPPDATA%\Programs\ClipKit.
 
 #ifndef AppVersion
-  #define AppVersion "0.3.0"
+  #define AppVersion "0.3.1"
 #endif
 
 [Setup]
@@ -22,6 +22,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ChangesEnvironment=yes
 WizardStyle=modern
+SetupIconFile=..\src\clipkit\webui\clipkit.ico
 UninstallDisplayIcon={app}\ClipKitApp.exe
 UninstallDisplayName=ClipKit
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "clipkit"
-version = "0.3.0"
+version = "0.3.1"
 description = "Cut long videos into captioned 9:16 short clips with yt-dlp, Whisper and FFmpeg - no API key needed."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "pyinstaller>=6.10"]
+dev = ["pytest>=8", "pyinstaller>=6.10", "pillow>=10"]
 
 [project.scripts]
 clipkit = "clipkit.cli:main"

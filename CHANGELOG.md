@@ -3,6 +3,11 @@
 Each release's section becomes its notes on the GitHub Releases page and in the app's "What's new" window.
 Add a `## <version>` section here before pushing a `v<version>` tag.
 
+## 0.3.1
+
+- **New app icon** for the Start menu, the desktop shortcut, the installer and the programs themselves.
+- The app window's taskbar icon is now sharp instead of blurry.
+
 ## 0.3.0
 
 - **Updates inside the app.** ClipKit checks GitHub for a new version once a day and shows a notice with the release notes. With the installer version, **Update now** downloads the new installer, checks its SHA-256 fingerprint, installs it and reopens ClipKit.

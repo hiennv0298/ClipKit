@@ -78,6 +78,8 @@ $env:Path = "$env:Path;$Bin"
 $shell = New-Object -ComObject WScript.Shell
 $lnk = $shell.CreateShortcut($Shortcut)
 $lnk.TargetPath = Join-Path $Venv "Scripts\clipkit-gui.exe"
+$ico = (& $vpy -c "import clipkit, pathlib; print(pathlib.Path(clipkit.__file__).parent / 'webui' / 'clipkit.ico')").Trim()
+if (Test-Path $ico) { $lnk.IconLocation = "$ico,0" }
 $lnk.Description = "Cut long videos into captioned short clips"
 $lnk.Save()
 

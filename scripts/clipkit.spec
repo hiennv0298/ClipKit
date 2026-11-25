@@ -14,8 +14,10 @@ for pkg in ("faster_whisper", "ctranslate2", "onnxruntime", "av"):
     hidden += h
 hidden += collect_submodules("yt_dlp")
 
+ICON = os.path.join(SPECPATH, "..", "src", "clipkit", "webui", "clipkit.ico")
+
 a = Analysis([os.path.join(SPECPATH, "clipkit_entry.py")], binaries=binaries, datas=datas, hiddenimports=hidden)
 pyz = PYZ(a.pure)
-cli = EXE(pyz, a.scripts, [], exclude_binaries=True, name="clipkit", console=True)
-app = EXE(pyz, a.scripts, [], exclude_binaries=True, name="ClipKitApp", console=False)
+cli = EXE(pyz, a.scripts, [], exclude_binaries=True, name="clipkit", console=True, icon=ICON)
+app = EXE(pyz, a.scripts, [], exclude_binaries=True, name="ClipKitApp", console=False, icon=ICON)
 coll = COLLECT(cli, app, a.binaries, a.datas, name="ClipKit")
