@@ -1,0 +1,39 @@
+name: Release
+
+# Push a tag like v0.1.0 to build the Windows installer + portable zip and attach
+# them to a GitHub Release. Can also be started by hand from the Actions tab.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+      - name: Build
+        shell: pwsh
+        run: ./scripts/build.ps1 -DownloadFfmpeg
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: clipkit-windows
+          path: |
+            dist/ClipKit-Setup-*.exe
+            dist/ClipKit-*-portable.zip
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/ClipKit-Setup-*.exe
+            dist/ClipKit-*-portable.zip

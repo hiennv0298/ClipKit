@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.venv-build/
+build/
+dist/
+.pytest_cache/
+build-log.txt
+# local test output
+clipkit-output/
+*.mp4
+*.wav
