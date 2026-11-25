@@ -125,8 +125,9 @@
   pre.log { margin: 12px 0 0; padding: 12px; max-height: 220px; overflow: auto; border-radius: 10px;
     background: #0a0c12; border: 1px solid var(--border); color: #aab2c5; font: 12px/1.5 Consolas, monospace; }
 
+  #moments { margin-top: 24px; }
   .toolbar { position: sticky; top: 59px; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
-    margin: 26px 0 16px; padding: 12px 0; background: var(--bg); }
+    margin: 0 0 16px; padding: 12px 0; background: var(--bg); }
   .toolbar h2 { margin: 0; font-size: 17px; }
 
   .moments { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 18px; }
@@ -140,6 +141,12 @@
   .media .rank { left: 10px; top: 10px; font-weight: 600; }
   .media .dur { right: 10px; top: 10px; }
   .media .state { left: 10px; bottom: 10px; }
+  .play { position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px 0 0 -29px; border: 0;
+    border-radius: 50%; display: grid; place-items: center; cursor: pointer; background: rgba(0,0,0,.55);
+    box-shadow: 0 0 0 2px rgba(255,255,255,.75) inset; transition: transform .15s, background .15s; }
+  .play:hover { transform: scale(1.08); background: rgba(109, 93, 252, .85); }
+  .media video.preview { top: 50%; bottom: auto; height: auto; transform: translateY(-50%); object-fit: contain;
+    background: transparent; }
   .use { position: absolute; right: 10px; bottom: 10px; display: inline-flex; align-items: center; gap: 6px;
     padding: 5px 10px; border-radius: 8px; background: rgba(0,0,0,.72); cursor: pointer; font-size: 12.5px; user-select: none; }
   .use input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
@@ -167,6 +174,30 @@
     background: linear-gradient(100deg, var(--surface) 40%, #1b2030 50%, var(--surface) 60%) 0 0 / 300% 100%;
     animation: shimmer 1.6s infinite linear; }
   @keyframes shimmer { to { background-position: -150% 0; } }
+
+  .verbtn { background: none; border: 1px solid transparent; border-radius: 7px; padding: 2px 7px; color: var(--faint);
+    font-size: 12px; cursor: pointer; }
+  .verbtn:hover { color: var(--text); border-color: var(--border-2); }
+  .verbtn.new { color: #c4bcff; border-color: rgba(109, 93, 252, .45); background: var(--accent-soft); }
+  .updbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 18px max(28px, calc((100% - 1184px) / 2)) 0;
+    padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(109, 93, 252, .45);
+    background: linear-gradient(90deg, rgba(109, 93, 252, .18), rgba(155, 92, 246, .08)); }
+  .updbar b { font-weight: 600; }
+  .backdrop { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 20px;
+    background: rgba(3, 4, 8, .7); backdrop-filter: blur(3px); }
+  .modal { width: min(560px, 100%); max-height: 86vh; display: flex; flex-direction: column; padding: 22px 24px;
+    box-shadow: 0 24px 80px rgba(0,0,0,.55); }
+  .modal h2 { margin: 0 0 4px; font-size: 19px; }
+  .modal .sub { color: var(--muted); margin-bottom: 14px; }
+  .notes { overflow: auto; padding-right: 6px; color: #cdd3e1; }
+  .notes h3, .notes h4 { margin: 14px 0 6px; font-size: 15px; color: var(--text); }
+  .notes ul { margin: 6px 0; padding-left: 20px; }
+  .notes li { margin: 5px 0; }
+  .notes p { margin: 8px 0; }
+  .notes code, .cmd { font: 12.5px Consolas, monospace; background: #0a0c12; border: 1px solid var(--border);
+    border-radius: 6px; padding: 1px 5px; }
+  .cmd { display: block; padding: 10px 12px; margin: 6px 0 12px; white-space: pre-wrap; word-break: break-all; }
+  .modal .foot { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 18px; }
   @media (max-width: 640px) { main { padding: 16px; } .source-row { flex-direction: column; } header { padding: 12px 16px; }
     .ver { display: none; } .toolbar { top: 55px; } }
   header .btn { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -177,11 +208,13 @@
 <header>
   <div class="logo"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M5 3.5l8 4.5-8 4.5z" fill="#fff"/></svg></div>
   <div class="brand" onclick="go('#/')">ClipKit</div>
-  <span class="ver" id="ver"></span>
+  <button class="verbtn" id="ver" title="Check for updates" onclick="openUpdates(true)"></button>
   <div class="spacer"></div>
   <button class="btn ghost small" onclick="api('/api/open', {})">Open output folder</button>
 </header>
+<div id="updbar" hidden></div>
 <main id="view"></main>
+<div id="modal"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -235,7 +268,6 @@ async function poll() {
   try {
     const st = await (await fetch("/api/state")).json();
     const prev = S.state; S.state = st;
-    $("#ver").textContent = "v" + st.version;
     onState(prev, st);
   } catch (e) { /* app closed */ }
 }
@@ -305,7 +337,7 @@ function homePage() {
         const r = await api("/api/pick", { kind: "folder" }); if (r.path) { out.value = r.path; await saveSettings({ out: r.path }); loadProjects(); } } }, "Browse"))),
     h("div", { class: "toggles" }, chk("captions", "Burn in captions"), chk("title", "Title at the top"),
       chk("uppercase", "Uppercase captions"), chk("review", "Let me review moments before rendering"),
-      chk("force", "Start over (ignore saved results)")));
+      chk("force", "Start over (ignore saved results)"), chk("check_updates", "Check for updates once a day")));
   const page = h("div", {},
     h("section", { class: "card hero" },
       h("h1", {}, "Turn long videos into Shorts"),
@@ -429,7 +461,17 @@ function renderMoments() {
     h("label", { class: "check" }, h("input", { type: "checkbox", checked: s.captions, onchange: e => saveSettings({ captions: e.target.checked }) }), "Captions"),
     h("button", { class: "btn", onclick: () => api("/api/open", { id: p.id }) }, "Open folder"),
     h("button", { class: "btn primary", disabled: st.busy || !on, onclick: renderClips }, rendered ? `Re-render ${plural(on, "clip")}` : `Render ${plural(on, "clip")}`)));
-  box.append(h("div", { class: "moments" }, segs.map((seg, i) => momentCard(p, seg, i, working))));
+  const order = segs.map((seg, i) => [seg, i]).sort((a, b) => (!!b[0].clip - !!a[0].clip) || a[1] - b[1]);
+  box.append(h("div", { class: "moments" }, order.map(([seg, i]) => momentCard(p, seg, i, working))));
+}
+function playPreview(e, p, seg, media) {
+  e.stopPropagation();
+  const [img, btn] = [$("img.fg", media), $(".play", media)];
+  const v = h("video", { class: "preview", src: `${p.source}#t=${seg.start.toFixed(2)},${seg.end.toFixed(2)}`, controls: true,
+    autoplay: true, playsinline: true, preload: "auto" });
+  v.addEventListener("timeupdate", () => { if (v.currentTime >= seg.end) { v.pause(); v.currentTime = seg.start; } });
+  v.addEventListener("error", () => { toast("This video format can't be previewed here. Render the clip to watch it.", true); v.replaceWith(img); media.append(btn); });
+  img.replaceWith(v); btn.remove();
 }
 function momentCard(p, seg, i, working) {
   const off = seg.enabled === false, dur = seg.end - seg.start;
@@ -438,7 +480,9 @@ function momentCard(p, seg, i, working) {
     media.append(h("video", { src: seg.clip, poster: seg.cover || seg.thumb, controls: true, preload: "none", playsinline: true }));
   } else {
     media.append(h("div", { class: "blur", style: `background-image:url('${seg.thumb}')` }), h("img", { class: "fg", src: seg.thumb, alt: "" }),
-      h("span", { class: "badge state" }, working && S.state.phase === "rendering" && seg.enabled !== false ? "Rendering…" : "Preview"));
+      h("span", { class: "badge state" }, working && S.state.phase === "rendering" && seg.enabled !== false ? "Rendering…" : "Preview"),
+      h("button", { class: "play", title: "Play this moment from the original video", onclick: e => playPreview(e, p, seg, media),
+        html: '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M8 5.5v13l11-6.5z" fill="#fff"/></svg>' }));
   }
   media.append(h("span", { class: "badge rank" }, "#" + (seg.rank || i + 1)), h("span", { class: "badge dur" }, Math.round(dur) + "s"));
   if (!seg.clip) media.append(h("label", { class: "use" }, h("input", { type: "checkbox", checked: !off,
@@ -487,13 +531,119 @@ function copyText(p, seg) {
   navigator.clipboard.writeText(`${seg.title}\n\n${text}${credit}`).then(() => toast("Copied title, description and source credit."));
 }
 
+// ---------- updates
+let U = null, updTimer = null, updDismissed = false;
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]); }
+function md(text) {  // tiny Markdown subset for release notes: headings, bullets, bold, italics, code, links
+  const inline = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+    .replace(/\*([^*]+)\*/g, "<i>$1</i>")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  let html = "", list = false;
+  for (const raw of String(text || "").replace(/\r/g, "").split("\n")) {
+    const line = raw.trim(), item = line.match(/^[-*]\s+(.*)$/);
+    if (item) { if (!list) { html += "<ul>"; list = true; } html += `<li>${inline(item[1])}</li>`; continue; }
+    if (list) { html += "</ul>"; list = false; }
+    const head = line.match(/^(#{1,4})\s+(.*)$/);
+    if (head) html += head[1].length <= 2 ? `<h3>${inline(head[2])}</h3>` : `<h4>${inline(head[2])}</h4>`;
+    else if (line) html += `<p>${inline(line)}</p>`;
+  }
+  html += list ? "</ul>" : "";
+  return html || "<p>No release notes.</p>";
+}
+async function loadUpdate(force) {
+  try { U = force ? await api("/api/update/check", {}) : await api("/api/update"); } catch (e) { return null; }
+  const ver = $("#ver"); ver.textContent = "v" + U.current + (U.newer ? " · update" : "");
+  ver.classList.toggle("new", !!U.newer);
+  renderUpdBar();
+  return U;
+}
+function renderUpdBar() {
+  const bar = $("#updbar");
+  bar.hidden = !(U && U.newer && !updDismissed);
+  if (bar.hidden) return;
+  bar.className = "updbar"; bar.innerHTML = "";
+  put(bar, h("span", { style: "flex:1" }, h("b", {}, `ClipKit ${U.latest} is available.`), ` You have ${U.current}.`),
+    h("button", { class: "btn small", onclick: () => openUpdates(false) }, "What's new"),
+    updateButton("small"),
+    h("button", { class: "btn ghost small", title: "Hide until next time", onclick: () => { updDismissed = true; renderUpdBar(); } }, "Later"));
+}
+function updateButton(size) {
+  if (U.can_install) return h("button", { class: `btn primary ${size}`, onclick: installUpdate }, "Update now");
+  if (U.mode === "portable") return h("a", { class: `btn primary ${size}`, href: U.page, target: "_blank", style: "text-decoration:none" }, "Download");
+  return h("button", { class: `btn primary ${size}`, onclick: () => openUpdates(false) }, "How to update");
+}
+function closeModal() { const box = $("#modal"); box.innerHTML = ""; delete box.dataset.locked; }
+function modal(...kids) {
+  const box = $("#modal"); box.innerHTML = "";
+  box.append(h("div", { class: "backdrop", onclick: e => { if (e.target === e.currentTarget && !box.dataset.locked) closeModal(); } },
+    h("div", { class: "card modal" }, ...kids.flat().filter(Boolean))));
+}
+async function openUpdates(check) {
+  if (check) { modal(h("h2", {}, "Checking for updates…")); await loadUpdate(true); if (!U) return closeModal(); }
+  const close = h("button", { class: "btn", onclick: closeModal }, "Close");
+  const page = h("a", { class: "link", href: U.page, target: "_blank" }, "Release page");
+  if (U.error && !U.latest) return modal(h("h2", {}, "Couldn't check for updates"), h("div", { class: "sub" }, U.error), h("div", { class: "foot" }, close));
+  if (!U.newer) return modal(h("h2", {}, "You're up to date"), h("div", { class: "sub" }, `ClipKit ${U.current} is the latest version.`),
+    h("div", { class: "notes", html: md(U.notes) }), h("div", { class: "foot" }, page, close));
+  const howto = U.mode === "python" ? [
+    h("div", { class: "sub", style: "margin:14px 0 0" }, "Installed with the command line? Run it again to update:"),
+    h("code", { class: "cmd" }, `irm https://raw.githubusercontent.com/${U.repo}/main/scripts/install.ps1 | iex`),
+    h("div", { class: "sub" }, "Installed with pipx:"), h("code", { class: "cmd" }, "pipx upgrade clipkit")] : null;
+  modal(h("h2", {}, `What's new in ClipKit ${U.latest}`), h("div", { class: "sub" }, `You have ${U.current}.`),
+    h("div", { class: "notes", html: md(U.notes) }), howto,
+    h("div", { class: "foot" }, page, h("button", { class: "btn", onclick: closeModal }, "Later"), U.mode === "python" ? null : updateButton("")));
+}
+async function installUpdate() {
+  if (S.state.busy) { toast("Wait until ClipKit has finished its current job, then update.", true); return; }
+  await api("/api/update/install", {});
+  const bar = h("div", { class: "bar", style: "margin-top:8px" }, h("i", { style: "width:0%" }));
+  const msg = h("div", { class: "sub" }, "Downloading the update…");
+  modal(h("h2", {}, `Updating to ClipKit ${U.latest}`), msg, bar);
+  $("#modal").dataset.locked = "1";
+  let gone = 0;
+  clearInterval(updTimer);
+  updTimer = setInterval(async () => {
+    let st;
+    try { st = await (await fetch("/api/update")).json(); }
+    catch (e) {  // the app has quit so the installer can replace its files
+      gone++;
+      if (gone === 3) msg.textContent = "Installing… ClipKit will reopen in a new window in a moment. You can close this one.";
+      if (gone === 8) window.close();
+      return;
+    }
+    const p = st.progress || {};
+    $("i", bar).style.width = (p.phase === "downloading" ? p.progress : 100) + "%";
+    if (p.phase === "downloading") msg.textContent = `Downloading the update… ${Math.round(p.progress)}%`;
+    else if (p.phase === "verifying") msg.textContent = "Checking the download…";
+    else if (p.phase === "restarting") msg.textContent = "Installing… ClipKit will close and reopen in a moment.";
+    else if (p.phase === "error") {
+      clearInterval(updTimer);
+      closeModal();
+      modal(h("h2", {}, "Update failed"), h("div", { class: "error" }, p.error),
+        h("div", { class: "foot" }, h("a", { class: "link", href: U.page, target: "_blank" }, "Download from the Releases page"),
+          h("button", { class: "btn", onclick: closeModal }, "Close")));
+    }
+  }, 700);
+}
+function showWhatsNew() {
+  if (!U || !U.whats_new || $("#modal").innerHTML) return;
+  const w = U.whats_new;
+  modal(h("h2", {}, `What's new in ClipKit ${w.version}`), h("div", { class: "sub" }, "ClipKit was updated."),
+    h("div", { class: "notes", html: md(w.notes) }),
+    h("div", { class: "foot" }, h("button", { class: "btn primary", onclick: () => { closeModal(); api("/api/update/seen", {}); } }, "Got it")));
+}
+
 // ---------- start
+document.addEventListener("play", e => document.querySelectorAll("video").forEach(v => { if (v !== e.target) v.pause(); }), true);
 window.addEventListener("pagehide", () => navigator.sendBeacon("/api/bye", "{}"));
 (async () => {
   await loadSettings();
   await poll();
   render();
   pollTimer = setInterval(poll, 800);
+  await loadUpdate(false);
+  showWhatsNew();
+  setTimeout(async () => { await loadUpdate(false); showWhatsNew(); }, 8000);  // after the first check finishes
 })();
 </script>
 </body>

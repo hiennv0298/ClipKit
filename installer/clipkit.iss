@@ -2,7 +2,7 @@
 ; Installs per user (no admin) into %LOCALAPPDATA%\Programs\ClipKit.
 
 #ifndef AppVersion
-  #define AppVersion "0.2.0"
+  #define AppVersion "0.3.0"
 #endif
 
 [Setup]
@@ -45,8 +45,15 @@ Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; \
 
 [Run]
 Filename: "{app}\ClipKitApp.exe"; Description: "Open ClipKit now"; Flags: postinstall nowait skipifsilent
+; The in-app updater runs this installer with /VERYSILENT /RELAUNCH=1: reopen ClipKit when done.
+Filename: "{app}\ClipKitApp.exe"; Flags: nowait; Check: RelaunchRequested
 
 [Code]
+function RelaunchRequested: Boolean;
+begin
+  Result := ExpandConstant('{param:relaunch|0}') = '1';
+end;
+
 function NeedsAddPath(Dir: string): Boolean;
 var
   Paths: string;

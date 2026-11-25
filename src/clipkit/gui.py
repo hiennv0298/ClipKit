@@ -22,7 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
-from clipkit import __version__
+from clipkit import __version__, updates
 from clipkit.pipeline import Options, clip_name, prepare, render_all, save_segments
 from clipkit.util import (Cancelled, ClipKitError, add_log_sink, app_home, default_output_dir, log,
                           parse_section, read_json, request_cancel, reset_cancel, write_json)
@@ -32,12 +32,14 @@ SETTINGS_FILE = "gui-settings.json"
 SERVER_FILE = "gui-server.json"
 DEFAULTS = {"clips": 5, "min_len": 20.0, "max_len": 60.0, "layout": "blur", "crop_x": 0.5, "language": "",
             "model": "small", "captions": True, "title": True, "uppercase": False, "review": True,
-            "section": "", "force": False, "out": str(default_output_dir())}
+            "section": "", "force": False, "out": str(default_output_dir()), "check_updates": True}
 STEPS = {1: (0, 15), 2: (15, 55), 3: (70, 5), 4: (75, 25)}  # progress bar share per step: (start, width)
 THUMB_W, THUMB_H = 384, 216
+SERVER: ThreadingHTTPServer | None = None
 IDLE_EXIT = 150  # quit after this many seconds without the page (never while working)
 SEGMENT_KEYS = ("rank", "start", "end", "title", "score", "reasons", "text", "enabled")
-MEDIA_TYPES = {".mp4": "video/mp4", ".jpg": "image/jpeg", ".png": "image/png",
+MEDIA_TYPES = {".mp4": "video/mp4", ".m4v": "video/mp4", ".mov": "video/quicktime", ".webm": "video/webm",
+               ".mkv": "video/x-matroska", ".jpg": "image/jpeg", ".png": "image/png",
                ".srt": "text/plain; charset=utf-8", ".txt": "text/plain; charset=utf-8"}
 
 
@@ -288,7 +290,7 @@ def project_detail(pid: str) -> dict:
         out.append(item)
     return {"id": pid, "path": str(d), "info": {k: info.get(k) for k in ("title", "uploader", "url", "license",
                                                                           "duration", "width", "height")},
-            "transcribed": (d / "transcript.json").is_file(), "segments": out}
+            "transcribed": (d / "transcript.json").is_file(), "source": f"/source/{pid}", "segments": out}
 
 
 def clean_segments(raw: list) -> list[dict]:
@@ -464,6 +466,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(STATE.snapshot())
             if path == "/api/settings":
                 return self._json(load_settings())
+            if path == "/api/update":
+                return self._json(dict(updates.status(), enabled=load_settings()["check_updates"]))
             if path == "/api/projects":
                 return self._json(list_projects())
             if path == "/api/project":
@@ -471,6 +475,13 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith("/thumb/"):
                 _, _, pid, at = path.split("/", 3)
                 return self._serve_file(make_thumb(pid, round(float(at), 1)))
+            if path.startswith("/source/"):  # the original video, for previews in the moment cards
+                from clipkit.download import source_video
+
+                video = source_video(project_dir(path.split("/", 2)[2]))
+                if video.suffix.lower() not in MEDIA_TYPES or not video.is_file():
+                    return self._send(404, b"Not found", "text/plain")
+                return self._serve_file(video)
             if path.startswith("/files/"):
                 _, _, pid, rel = path.split("/", 3)
                 base = project_dir(pid).resolve()
@@ -538,6 +549,19 @@ class Handler(BaseHTTPRequestHandler):
                 if STATE.busy:
                     STATE.status = "Stopping..."
             return {"ok": True}
+        if path == "/api/update/check":
+            updates.check(force=True)
+            return dict(updates.status(), enabled=load_settings()["check_updates"])
+        if path == "/api/update/seen":
+            updates.mark_seen()
+            return {"ok": True}
+        if path == "/api/update/install":
+            if STATE.busy:
+                raise ClipKitError("Wait until ClipKit has finished its current job, then update.")
+            if updates.PROGRESS["phase"] in ("downloading", "verifying", "restarting"):
+                return {"ok": True}
+            threading.Thread(target=_install_update, daemon=True).start()
+            return {"ok": True}
         if path == "/api/pick":
             return {"path": pick(body.get("kind", "file"), load_settings()["out"])}
         if path == "/api/open":
@@ -557,6 +581,19 @@ class Handler(BaseHTTPRequestHandler):
 
 
 # ---------------------------------------------------------------- window and lifecycle
+
+def _install_update() -> None:
+    """Runs on a thread: on success the installer is running and this app quits so files can be replaced."""
+    def quit_soon() -> None:
+        if SERVER:
+            threading.Timer(2.5, SERVER.shutdown).start()  # let the page see "restarting" first
+
+    try:
+        updates.download_and_install(quit_soon)
+    except ClipKitError:
+        pass  # the error is in updates.PROGRESS for the page to show
+
+
 
 def _browser() -> str | None:
     candidates = []
@@ -613,6 +650,7 @@ def _ensure_streams() -> None:
 
 
 def main() -> int:
+    global SERVER
     _ensure_streams()
     existing = _running_instance()
     if existing:
@@ -621,6 +659,7 @@ def main() -> int:
     port = int(os.environ.get("CLIPKIT_GUI_PORT") or 0)
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     server.daemon_threads = True
+    SERVER = server
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     try:
         write_json(app_home() / SERVER_FILE, {"port": server.server_address[1], "pid": os.getpid()})
@@ -628,6 +667,8 @@ def main() -> int:
         pass
     add_log_sink(STATE.on_log)
     threading.Thread(target=_watchdog, args=(server,), daemon=True).start()
+    if load_settings()["check_updates"]:
+        updates.start_background_check()
     if not os.environ.get("CLIPKIT_GUI_NO_WINDOW"):
         open_window(url)
     print(f"ClipKit is running at {url}  (close the app window to quit)", flush=True)

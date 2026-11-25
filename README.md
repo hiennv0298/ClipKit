@@ -59,10 +59,20 @@ The ClipKit window is a page served by ClipKit itself on `127.0.0.1` and shown i
 
 1. **Paste a link** (or **Browse** for a video file), set the number of clips and their length, pick the frame and press **Find moments**. *More options* has the speech model, a time range, captions and title switches and the output folder.
 2. ClipKit downloads, transcribes and picks moments. Each moment is a card with a preview, the reasons it was picked and the transcript.
-3. **Untick** the moments you don't want, edit the **title** or the **start/end** times, then press **Render**.
-4. Rendered clips play right in their cards. **Copy title & description** copies a ready-to-paste description with the source credit.
+3. Press **▶** on a card to watch that moment from the original video. **Untick** the moments you don't want, edit the **title** or the **start/end** times, then press **Render**.
+4. Rendered clips move to the top as each one finishes and play right in their cards. **Copy title & description** copies a ready-to-paste description with the source credit.
 
 Projects stay in the list on the home screen, so you can come back, change the selection and render again.
+
+### Updates
+
+ClipKit checks GitHub for a newer release once a day (no account, nothing about you is sent) and shows a notice with the release notes. Click the version in the header to check right away.
+
+- **Installer version:** **Update now** downloads the new installer, checks it against the release's `SHA256SUMS.txt`, installs it over the current one and reopens ClipKit. Your projects, settings and Whisper models stay.
+- **Portable zip:** **Download** opens the release page.
+- **Command-line install:** the notice shows the command to run again.
+
+After an update, a *What's new* window shows that version's notes once. Turn the daily check off under *More options*.
 
 ## Command line
 
@@ -168,11 +178,20 @@ Build the Windows release (the installer needs [Inno Setup 6](https://jrsoftware
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1 -DownloadFfmpeg
 ```
 
-This produces `dist\ClipKit-Setup-<ver>.exe` and `dist\ClipKit-<ver>-portable.zip`. Pushing a `v*` tag makes the **Release** workflow build both and attach them to the Releases page.
+This produces `dist\ClipKit-Setup-<ver>.exe` and `dist\ClipKit-<ver>-portable.zip`.
+
+### Releasing a new version
+
+1. Set the new version in `pyproject.toml`, `src/clipkit/__init__.py` and `installer/clipkit.iss`.
+2. Add a `## <version>` section at the top of [`CHANGELOG.md`](CHANGELOG.md). Write it for users: it becomes the release text on GitHub and the *What's new* window in the app.
+3. Commit, then push a tag: `git tag -a v<version> -m "ClipKit <version>"` and `git push origin v<version>`.
+
+The **Release** workflow checks that the tag matches the version and that the changelog section exists, builds the installer and the portable zip, writes `SHA256SUMS.txt`, and publishes all three with the notes. Installed copies see the update within a day.
 
 ```
 src/clipkit/
   gui.py         the app: local web server, JSON API, app window
+  updates.py     checks GitHub Releases, downloads, verifies and installs updates
   webui/         the app's page (HTML, CSS, JS in one file, no dependencies)
   cli.py         run / render / gui / doctor commands
   pipeline.py    ties the steps together, caches results for fast re-runs
