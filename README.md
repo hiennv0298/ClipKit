@@ -14,7 +14,7 @@ Cắt video dài (podcast, phỏng vấn, bài giảng, talkshow) thành **clip 
 
 ### Cách 1: Tải file cài đặt (dễ nhất)
 
-1. Vào trang **Releases** của repo, tải `ClipKit-Setup-<phiên bản>.exe` (hoặc `ClipKit-<phiên bản>-portable.zip` nếu không muốn cài).
+1. Vào trang [**Releases**](https://github.com/hiennv0298/ClipKit/releases/latest), tải `ClipKit-Setup-<phiên bản>.exe` (hoặc `ClipKit-<phiên bản>-portable.zip` nếu không muốn cài).
 2. Chạy file cài. Không cần quyền admin; app cài vào `%LOCALAPPDATA%\Programs\ClipKit`, đã kèm Python và FFmpeg.
 3. Mở **ClipKit** từ Start menu hoặc desktop, dán link video, trả lời 2–3 câu hỏi. Xong sẽ tự mở thư mục chứa clip.
 
@@ -29,8 +29,13 @@ Cần Python 3.10+ (`winget install Python.Python.3.12`).
 **Cài lệnh `clipkit` một lần, dùng ở mọi nơi:**
 
 ```powershell
-$env:CLIPKIT_REPO = "<github-user>/clipkit"
-irm https://raw.githubusercontent.com/<github-user>/clipkit/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/hiennv0298/ClipKit/main/scripts/install.ps1 | iex
+```
+
+Gỡ lệnh `clipkit` đã cài theo cách này (trong thư mục repo):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\install.ps1 -Uninstall
 ```
 
 **Hoặc chạy thẳng từ thư mục repo** (tải ZIP hoặc `git clone`), lần đầu tự cài thư viện:
@@ -42,7 +47,7 @@ run.cmd run "https://www.youtube.com/watch?v=..." -n 5
 **Hoặc với pip/pipx:**
 
 ```bash
-pipx install git+https://github.com/<github-user>/clipkit
+pipx install git+https://github.com/hiennv0298/ClipKit
 ```
 
 ## Cách dùng

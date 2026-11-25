@@ -1,6 +1,6 @@
 # ClipKit installer for the command line (no admin rights needed).
 #
-#   Install from GitHub:   irm https://raw.githubusercontent.com/<github-user>/clipkit/main/scripts/install.ps1 | iex
+#   Install from GitHub:   irm https://raw.githubusercontent.com/hiennv0298/ClipKit/main/scripts/install.ps1 | iex
 #   Install from a clone:  powershell -ExecutionPolicy Bypass -File scripts\install.ps1
 #   Uninstall:             powershell -ExecutionPolicy Bypass -File scripts\install.ps1 -Uninstall
 #
@@ -12,7 +12,7 @@
 # The file is kept ASCII-only so Windows PowerShell 5.1 reads it correctly.
 
 $ErrorActionPreference = "Stop"
-$Repo = if ($env:CLIPKIT_REPO) { $env:CLIPKIT_REPO } else { "<github-user>/clipkit" }
+$Repo = if ($env:CLIPKIT_REPO) { $env:CLIPKIT_REPO } else { "hiennv0298/ClipKit" }
 $Ref = if ($env:CLIPKIT_REF) { $env:CLIPKIT_REF } else { "main" }
 $Uninstall = ($args -contains "-Uninstall")
 $Root = Join-Path $env:LOCALAPPDATA "ClipKit"
@@ -63,7 +63,6 @@ $local = if ($PSScriptRoot) { Split-Path $PSScriptRoot -Parent } else { $null }
 if ($local -and (Test-Path (Join-Path $local "pyproject.toml"))) {
     $spec = $local
 } else {
-    if ($Repo -like "<*") { throw "Dat ten repo truoc: `$env:CLIPKIT_REPO = 'ten-github/clipkit'" }
     $spec = "https://github.com/$Repo/archive/$Ref.zip"
 }
 Write-Host "Cai ClipKit tu $spec (lan dau mat vai phut) ..."
