@@ -121,7 +121,8 @@ def write_json(path: Path, data: Any) -> None:
 
 
 def read_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"))
+    # utf-8-sig: also accept files saved with a BOM (Notepad, PowerShell 5.1)
+    return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
 def run(cmd: Sequence[str], cwd: Path | None = None) -> subprocess.CompletedProcess:
@@ -154,6 +155,31 @@ def run(cmd: Sequence[str], cwd: Path | None = None) -> subprocess.CompletedProc
         tail = "\n".join((err or out or "").strip().splitlines()[-15:])
         raise ClipKitError(f"Command failed ({Path(args[0]).name}):\n{tail}")
     return subprocess.CompletedProcess(args, proc.returncode, out, err)
+
+
+def move_to_trash(path: Path) -> None:
+    """Move a file or folder to the Recycle Bin (Windows), so it can be restored."""
+    path = Path(path)
+    if not path.exists():
+        return
+    if os.name != "nt":
+        import shutil
+
+        shutil.rmtree(path) if path.is_dir() else path.unlink()
+        return
+    import ctypes
+    from ctypes import wintypes
+
+    class SHFILEOPSTRUCTW(ctypes.Structure):
+        _fields_ = [("hwnd", wintypes.HWND), ("wFunc", wintypes.UINT), ("pFrom", wintypes.LPCWSTR),
+                    ("pTo", wintypes.LPCWSTR), ("fFlags", ctypes.c_ushort), ("fAnyOperationsAborted", wintypes.BOOL),
+                    ("hNameMappings", ctypes.c_void_p), ("lpszProgressTitle", wintypes.LPCWSTR)]
+
+    fo_delete, flags = 3, 0x40 | 0x10 | 0x04 | 0x400  # ALLOWUNDO | NOCONFIRMATION | SILENT | NOERRORUI
+    op = SHFILEOPSTRUCTW(None, fo_delete, str(path.resolve()) + "\0", None, flags, False, None, None)
+    rc = ctypes.windll.shell32.SHFileOperationW(ctypes.byref(op))
+    if rc or op.fAnyOperationsAborted or path.exists():
+        raise ClipKitError(f"Could not move {path.name} to the Recycle Bin (is it open in another program?).")
 
 
 def setup_console() -> None:

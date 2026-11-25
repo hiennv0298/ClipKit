@@ -130,6 +130,13 @@ def mark_seen() -> None:
 
 def status() -> dict:
     state = _load()
+    seen = state.get("seen_version")
+    if seen and seen != __version__ and (state.get("whats_new") or {}).get("version") != __version__:
+        # Just updated and the background check has not prepared the notes yet: do it now.
+        with _lock:
+            state = _load()
+            _note_whats_new(state)
+            _save(state)
     latest = state.get("latest", "")
     newer = bool(latest) and parse_version(latest) > parse_version(__version__)
     mode = install_mode()
@@ -151,8 +158,32 @@ def _expected_hash(sums_url: str, name: str) -> str:
     raise ClipKitError(f"SHA256SUMS.txt has no entry for {name}.")
 
 
-def download_and_install(on_launched) -> None:
-    """Download the new installer, verify it, start it silently, then call on_launched()."""
+RELAUNCH_FILE = "relaunch.json"
+RELAUNCH_WINDOW = 600  # seconds a relaunch note stays valid
+
+
+def take_relaunch() -> dict | None:
+    """The note left by the app that started an update (its port), if recent. Read once."""
+    path = app_home() / RELAUNCH_FILE
+    try:
+        note = read_json(path)
+    except (OSError, ValueError):
+        return None
+    try:
+        path.unlink()
+    except OSError:
+        pass
+    if not isinstance(note, dict) or time.time() - float(note.get("at") or 0) > RELAUNCH_WINDOW:
+        return None
+    return note
+
+
+def download_and_install(on_launched, port: int | None = None) -> None:
+    """Download the new installer, verify it, start it silently, then call on_launched().
+
+    `port` is remembered so the updated app can serve on the same address and the
+    open app window simply reloads into the new version.
+    """
     state = _load()
     st = status()
     if not st["can_install"]:
@@ -186,6 +217,8 @@ def download_and_install(on_launched) -> None:
             raise ClipKitError("The downloaded installer does not match its published SHA-256 fingerprint, "
                                "so it was deleted. Try again later or download it from the Releases page.")
         tmp.replace(dest)
+        if port:
+            write_json(app_home() / RELAUNCH_FILE, {"port": port, "at": time.time(), "from": __version__})
         flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         subprocess.Popen([str(dest), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS",
                           "/RELAUNCH=1"], creationflags=flags, close_fds=True)

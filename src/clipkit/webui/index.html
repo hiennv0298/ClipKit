@@ -89,6 +89,14 @@
   .thumb { position: relative; aspect-ratio: 16 / 9; background: #0e1119 center / cover no-repeat; }
   .badge { position: absolute; padding: 2px 8px; border-radius: 6px; background: rgba(0,0,0,.72); font-size: 12px; }
   .thumb .badge { right: 8px; bottom: 8px; }
+  .del { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; border-radius: 8px; border: 0;
+    display: grid; place-items: center; cursor: pointer; color: #fff; background: rgba(0,0,0,.65);
+    opacity: 0; transition: opacity .15s, background .15s; }
+  .project:hover .del, .del:focus-visible { opacity: 1; }
+  .del:hover { background: #c2414b; }
+  .btn.remove { margin-left: auto; color: #ffb4b4; }
+  .btn.danger-solid { border: 0; background: #c2414b; color: #fff; font-weight: 600; }
+  .btn.danger-solid:hover { background: #d44d58; }
   .project .body { padding: 12px 14px 14px; }
   .project .title { font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
     overflow: hidden; min-height: 40px; }
@@ -260,6 +268,8 @@ const tsShort = s => { s = Math.max(0, Math.round(+s)); const h = Math.floor(s /
 function parseTs(v) { const p = String(v).trim().split(":"); if (!p[0] || p.length > 3) return NaN;
   return p.reduce((t, x) => t * 60 + Number(x), 0); }
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+const fmtSize = b => b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : Math.max(1, Math.round(b / 1e6)) + " MB";
+const TRASH = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>';
 const isCC = lic => /creative commons/i.test(lic || "");
 function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
 
@@ -384,11 +394,13 @@ function renderProjects() {
   const box = $("#projects"); if (!box) return;
   $("#pcount").textContent = S.projects.length ? S.projects.length : "";
   box.innerHTML = "";
+  box.className = S.projects.length ? "grid" : "";
   if (!S.projects.length) { box.append(h("div", { class: "card empty" }, "No projects yet. Paste a link above to make your first clips.")); return; }
   box.className = "grid";
   for (const p of S.projects) {
     box.append(h("div", { class: "card project", onclick: () => go("#/p/" + encodeURIComponent(p.id)) },
-      h("div", { class: "thumb", style: `background-image:url('${p.thumb}')` }, h("span", { class: "badge" }, tsShort(p.duration))),
+      h("div", { class: "thumb", style: `background-image:url('${p.thumb}')` }, h("span", { class: "badge" }, tsShort(p.duration)),
+        h("button", { class: "del", title: "Delete project", html: TRASH, onclick: e => { e.stopPropagation(); deleteProject(p); } })),
       h("div", { class: "body" },
         h("div", { class: "title", title: p.title }, p.title),
         h("div", { class: "meta" }, p.uploader ? h("span", {}, p.uploader) : null,
@@ -506,10 +518,38 @@ function momentCard(p, seg, i, working) {
       seg.text ? h("div", { class: "excerpt", onclick: e => e.target.classList.toggle("open") }, seg.text) : null,
       h("div", { class: "actions" },
         h("button", { class: "btn small", onclick: () => copyText(p, seg) }, "Copy title & description"),
+        h("button", { class: "btn small ghost remove", title: "Remove this moment", html: TRASH, onclick: () => removeMoment(p, seg) }),
         seg.clip ? h("button", { class: "btn small", onclick: () => api("/api/open", { id: p.id, file: seg.clip_name }) }, "Show file") : null,
         seg.clip ? h("label", { class: "check", style: "margin-left:auto;font-size:12.5px" }, h("input", { type: "checkbox", checked: !off,
           onchange: e => { seg.enabled = e.target.checked; card.classList.toggle("off", !seg.enabled); saveMoments(); renderCountsSoon(); } }), "Use") : null)));
   return card;
+}
+function confirmBox(title, text, okLabel, onOk) {
+  const ok = h("button", { class: "btn danger-solid", onclick: async () => { ok.disabled = true; try { await onOk(); closeModal(); } catch (e) { ok.disabled = false; } } }, okLabel);
+  modal(h("h2", {}, title), h("div", { class: "sub", style: "margin-bottom:0" }, text),
+    h("div", { class: "foot" }, h("button", { class: "btn", onclick: closeModal }, "Cancel"), ok));
+}
+function deleteProject(p) {
+  if (S.state.busy && S.state.project === p.id) { toast("ClipKit is working on this project. Stop it first.", true); return; }
+  confirmBox("Delete this project?",
+    `“${p.title}” will be moved to the Recycle Bin: the downloaded video, the transcript` +
+    (p.clips ? ` and ${plural(p.clips, "rendered clip")}` : "") + ` (${fmtSize(p.size || 0)}). You can restore it from there.`,
+    "Delete", async () => {
+      await api("/api/project/delete", { id: p.id });
+      toast("Project moved to the Recycle Bin.");
+      loadProjects();
+    });
+}
+function removeMoment(p, seg) {
+  const rest = p.segments.filter(s => s !== seg);
+  const go = async () => {
+    document.querySelectorAll("video").forEach(v => v.pause());
+    await api("/api/moments/remove", { id: p.id, segments: rest, files: seg.clip_name ? [seg.clip_name] : [] });
+    loadProject(p.id);
+  };
+  if (!seg.clip) return go().then(() => toast("Moment removed."));
+  confirmBox("Remove this moment?", `“${seg.title}” and its rendered clip will be moved to the Recycle Bin.`, "Remove",
+    async () => { await go(); toast("Moment and clip moved to the Recycle Bin."); });
 }
 function renderCountsSoon() { clearTimeout(renderCountsSoon.t); renderCountsSoon.t = setTimeout(renderMoments, 250); }
 function setAll(v) { S.project.segments.forEach(s => s.enabled = v); saveMoments(); renderMoments(); }
@@ -609,10 +649,11 @@ async function installUpdate() {
     try { st = await (await fetch("/api/update")).json(); }
     catch (e) {  // the app has quit so the installer can replace its files
       gone++;
-      if (gone === 3) msg.textContent = "Installing… ClipKit will reopen in a new window in a moment. You can close this one.";
-      if (gone === 8) window.close();
+      if (gone === 3) msg.textContent = "Installing… this window will refresh by itself when the new version is ready.";
+      if (gone === 260) msg.textContent = "ClipKit has not come back yet. If nothing happens, open it again from the Start menu.";
       return;
     }
+    if (gone) { clearInterval(updTimer); location.reload(); return; }  // the updated app is serving here again
     const p = st.progress || {};
     $("i", bar).style.width = (p.phase === "downloading" ? p.progress : 100) + "%";
     if (p.phase === "downloading") msg.textContent = `Downloading the update… ${Math.round(p.progress)}%`;

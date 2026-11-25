@@ -78,9 +78,21 @@ def test_install_verifies_and_launches(tmp_path, monkeypatch):
     launched = []
     monkeypatch.setattr(updates.subprocess, "Popen", lambda args, **kw: launched.append(args))
     done = []
-    updates.download_and_install(lambda: done.append(True))
+    updates.download_and_install(lambda: done.append(True), port=51234)
     assert launched and launched[0][0].endswith(name) and "/RELAUNCH=1" in launched[0] and done
     assert updates.PROGRESS["phase"] == "restarting"
+    assert updates.take_relaunch()["port"] == 51234  # the updated app will serve on the same address
+
+
+def test_whats_new_without_background_check(tmp_path, monkeypatch):
+    fake_release(tmp_path, monkeypatch, version=__version__, body="- Fresh")
+    updates.check(force=True)
+    state = updates._load()
+    state["seen_version"] = "0.0.1"
+    state.pop("whats_new", None)
+    updates._save(state)
+    # no check() here: the page asks for status right after the updated app starts
+    assert updates.status()["whats_new"] == {"version": __version__, "notes": "- Fresh"}
 
 
 def test_install_rejects_bad_checksum(tmp_path, monkeypatch):

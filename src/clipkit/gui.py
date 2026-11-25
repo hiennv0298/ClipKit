@@ -24,7 +24,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from clipkit import __version__, updates
 from clipkit.pipeline import Options, clip_name, prepare, render_all, save_segments
-from clipkit.util import (Cancelled, ClipKitError, add_log_sink, app_home, default_output_dir, log,
+from clipkit.util import (Cancelled, ClipKitError, add_log_sink, app_home, default_output_dir, log, move_to_trash,
                           parse_section, read_json, request_cancel, reset_cancel, write_json)
 
 WEBUI = Path(__file__).with_name("webui")
@@ -268,7 +268,8 @@ def list_projects() -> list[dict]:
         at = thumb_at(segs[0]) if segs else round(min(30.0, duration / 3), 1)
         items.append({"id": d.name, "title": info.get("title") or d.name, "uploader": info.get("uploader") or "",
                       "license": info.get("license") or "", "duration": duration, "updated": max(stamps),
-                      "moments": len(segs), "clips": len(clips), "thumb": f"/thumb/{d.name}/{at}"})
+                      "moments": len(segs), "clips": len(clips), "thumb": f"/thumb/{d.name}/{at}",
+                      "size": sum(f.stat().st_size for f in d.rglob("*") if f.is_file())})
     items.sort(key=lambda x: x["updated"], reverse=True)
     return items
 
@@ -545,6 +546,25 @@ class Handler(BaseHTTPRequestHandler):
             opts = options_from(save_settings(body.get("settings") or {}))
             start_job("rendering", render_job, d, segments, opts)
             return {"ok": True}
+        if path == "/api/project/delete":
+            d = project_dir(body.get("id", ""))
+            if STATE.busy and STATE.project == d.name:
+                raise ClipKitError("ClipKit is working on this project. Stop it first.")
+            move_to_trash(d)  # the downloaded video, transcript and clips; a local source file is never touched
+            return {"ok": True}
+        if path == "/api/moments/remove":
+            d = project_dir(body.get("id", ""))
+            if STATE.busy and STATE.project == d.name:
+                raise ClipKitError("Wait until ClipKit has finished with this project.")
+            clips = (d / "clips").resolve()
+            for name in body.get("files") or []:
+                clip = (clips / str(name)).resolve()
+                if clip.parent != clips or clip.suffix.lower() != ".mp4":
+                    raise ClipKitError("Invalid clip.")
+                for f in (clip, clip.with_suffix(".srt"), clip.with_suffix(".jpg")):
+                    move_to_trash(f)
+            save_segments(d, clean_segments(body.get("segments") or []))
+            return {"ok": True}
         if path == "/api/stop":
             request_cancel()
             with STATE.lock:
@@ -591,7 +611,7 @@ def _install_update() -> None:
             threading.Timer(2.5, SERVER.shutdown).start()  # let the page see "restarting" first
 
     try:
-        updates.download_and_install(quit_soon)
+        updates.download_and_install(quit_soon, port=SERVER.server_address[1] if SERVER else None)
     except ClipKitError:
         pass  # the error is in updates.PROGRESS for the page to show
 
@@ -651,6 +671,16 @@ def _ensure_streams() -> None:
     sys.stderr = sys.stderr or stream
 
 
+def _window_if_nobody_returns(url: str, wait: float = 20) -> None:
+    """After an update the old window should reconnect by itself; open one if it doesn't."""
+    deadline = time.monotonic() + wait
+    while time.monotonic() < deadline:
+        if STATE.seen:
+            return
+        time.sleep(0.5)
+    open_window(url)
+
+
 def main() -> int:
     global SERVER
     _ensure_streams()
@@ -658,8 +688,13 @@ def main() -> int:
     if existing:
         open_window(existing)
         return 0
-    port = int(os.environ.get("CLIPKIT_GUI_PORT") or 0)
-    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    # After an in-app update, serve on the old address: the open window reconnects and reloads.
+    relaunch = updates.take_relaunch()
+    port = int(os.environ.get("CLIPKIT_GUI_PORT") or (relaunch or {}).get("port") or 0)
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    except OSError:  # the old port is taken by something else
+        server, relaunch = ThreadingHTTPServer(("127.0.0.1", 0), Handler), None
     server.daemon_threads = True
     SERVER = server
     url = f"http://127.0.0.1:{server.server_address[1]}/"
@@ -671,7 +706,9 @@ def main() -> int:
     threading.Thread(target=_watchdog, args=(server,), daemon=True).start()
     if load_settings()["check_updates"]:
         updates.start_background_check()
-    if not os.environ.get("CLIPKIT_GUI_NO_WINDOW"):
+    if relaunch and not os.environ.get("CLIPKIT_GUI_NO_WINDOW"):
+        threading.Thread(target=_window_if_nobody_returns, args=(url,), daemon=True).start()
+    elif not os.environ.get("CLIPKIT_GUI_NO_WINDOW"):
         open_window(url)
     print(f"ClipKit is running at {url}  (close the app window to quit)", flush=True)
     try:

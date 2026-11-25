@@ -62,7 +62,7 @@ The ClipKit window is a page served by ClipKit itself on `127.0.0.1` and shown i
 3. Press **▶** on a card to watch that moment from the original video. **Untick** the moments you don't want, edit the **title** or the **start/end** times, then press **Render**.
 4. Rendered clips move to the top as each one finishes and play right in their cards. **Copy title & description** copies a ready-to-paste description with the source credit.
 
-Projects stay in the list on the home screen, so you can come back, change the selection and render again.
+Projects stay in the list on the home screen, so you can come back, change the selection and render again. To clean up, hover a project and press the bin icon, or use the bin icon on a moment's card: files go to the Recycle Bin, and a video you picked from your computer is never deleted.
 
 ### Updates
 

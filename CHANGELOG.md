@@ -3,6 +3,13 @@
 Each release's section becomes its notes on the GitHub Releases page and in the app's "What's new" window.
 Add a `## <version>` section here before pushing a `v<version>` tag.
 
+## 0.3.2
+
+- **Delete projects** you no longer need: hover a project and press the bin icon. The folder (downloaded video, transcript, clips) goes to the Recycle Bin, so you can restore it. A video file you picked from your computer is never touched.
+- **Remove a moment** from a project with the bin icon on its card; its rendered clip goes to the Recycle Bin too.
+- After **Update now**, the open window refreshes into the new version instead of a second window opening. (This works from the next update on.)
+- The *What's new* window now shows reliably right after an update.
+
 ## 0.3.1
 
 - **New app icon** for the Start menu, the desktop shortcut, the installer and the programs themselves.
