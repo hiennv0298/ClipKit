@@ -1,108 +1,108 @@
 # ClipKit
 
-Cắt video dài (podcast, phỏng vấn, bài giảng, talkshow) thành **clip ngắn 9:16 có phụ đề**, sẵn sàng đăng TikTok, YouTube Shorts, Reels.
+Turn long videos (podcasts, interviews, lectures, talk shows) into **captioned 9:16 short clips**, ready for TikTok, YouTube Shorts and Reels.
 
-- **Không cần API key, không tốn token.** Chọn đoạn hay bằng thuật toán chấm điểm chạy trên máy.
-- **yt-dlp** tải video từ YouTube, TikTok, Facebook… (hơn 1.000 trang) hoặc dùng file có sẵn.
-- **Whisper** (faster-whisper) tạo phụ đề theo từng từ, nhận tiếng Việt tốt.
-- **FFmpeg** cắt, dựng khung dọc, chèn phụ đề tô sáng từng chữ đang nói và tiêu đề; tự dùng GPU NVIDIA (NVENC) nếu có.
-- Tự tải FFmpeg và model Whisper ở lần chạy đầu.
+- **No API key, no tokens.** The best moments are picked by a scoring algorithm that runs on your machine.
+- **yt-dlp** downloads from YouTube, TikTok, Facebook… (1,000+ sites), or use a video file you already have.
+- **Whisper** (faster-whisper) transcribes with word-level timestamps and handles Vietnamese well.
+- **FFmpeg** cuts, reframes to vertical, burns in captions that highlight the word being spoken, plus a title; uses NVIDIA GPU encoding (NVENC) automatically when available.
+- FFmpeg and the Whisper model are downloaded automatically on first run.
 
-Đo trên laptop i7-10750H + Quadro T1000: 6 phút video tiếng Việt → 2 clip trong 3 phút 41 giây (Whisper `small` trên CPU mất 3 phút 11 giây, mỗi clip dựng khoảng 12 giây).
+Measured on a laptop with an i7-10750H + Quadro T1000: 6 minutes of Vietnamese video → 2 clips in 3 min 41 s (Whisper `small` on CPU took 3 min 11 s; each clip rendered in about 12 s).
 
-## Cài đặt
+## Installation
 
-### Cách 1: Tải file cài đặt (dễ nhất)
+### Option 1: Download the installer (easiest)
 
-1. Vào trang [**Releases**](https://github.com/hiennv0298/ClipKit/releases/latest), tải `ClipKit-Setup-<phiên bản>.exe` (hoặc `ClipKit-<phiên bản>-portable.zip` nếu không muốn cài).
-2. Chạy file cài. Không cần quyền admin; app cài vào `%LOCALAPPDATA%\Programs\ClipKit`, đã kèm Python và FFmpeg.
-3. Mở **ClipKit** từ Start menu hoặc desktop, dán link video, trả lời 2–3 câu hỏi. Xong sẽ tự mở thư mục chứa clip.
+1. Go to the [**Releases**](https://github.com/hiennv0298/ClipKit/releases/latest) page and download `ClipKit-Setup-<version>.exe` (or `ClipKit-<version>-portable.zip` if you'd rather not install).
+2. Run the installer. No admin rights needed; the app installs to `%LOCALAPPDATA%\Programs\ClipKit` and bundles Python and FFmpeg.
+3. Open **ClipKit** from the Start menu or desktop, paste a video link and answer 2–3 questions. When it's done, the folder with your clips opens automatically.
 
-Lúc cài, chọn "Add ClipKit to PATH" để gõ được lệnh `clipkit` trong cmd.
+During setup, tick "Add ClipKit to PATH" to be able to type `clipkit` in a terminal.
 
-> File cài chưa có chữ ký số nên Windows SmartScreen có thể cảnh báo; bấm **More info → Run anyway**.
+> The installer is not code-signed yet, so Windows SmartScreen may warn you; click **More info → Run anyway**.
 
-### Cách 2: Chạy bằng cmd / PowerShell
+### Option 2: Run from the command line
 
-Cần Python 3.10+ (`winget install Python.Python.3.12`).
+Requires Python 3.10+ (`winget install Python.Python.3.12`).
 
-**Cài lệnh `clipkit` một lần, dùng ở mọi nơi:**
+**Install the `clipkit` command once, use it anywhere:**
 
 ```powershell
 irm https://raw.githubusercontent.com/hiennv0298/ClipKit/main/scripts/install.ps1 | iex
 ```
 
-Gỡ lệnh `clipkit` đã cài theo cách này (trong thư mục repo):
+To uninstall a `clipkit` command installed this way (from the repo folder):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\install.ps1 -Uninstall
 ```
 
-**Hoặc chạy thẳng từ thư mục repo** (tải ZIP hoặc `git clone`), lần đầu tự cài thư viện:
+**Or run it straight from the repo folder** (download the ZIP or `git clone`); dependencies are installed on first run:
 
 ```bat
 run.cmd run "https://www.youtube.com/watch?v=..." -n 5
 ```
 
-**Hoặc với pip/pipx:**
+**Or with pip/pipx:**
 
 ```bash
 pipx install git+https://github.com/hiennv0298/ClipKit
 ```
 
-## Cách dùng
+## Usage
 
 ```bash
-clipkit run "https://www.youtube.com/watch?v=VIDEO_ID"           # 5 clip, 20–60 giây
-clipkit run video.mp4 -n 8 --min 30 --max 90 --language vi       # file trên máy
-clipkit run "LINK" --section 10:00-30:00                         # chỉ xử lý một khúc
-clipkit run "LINK" --layout crop --crop-x 0.4                    # cắt đầy khung, lệch trái
-clipkit run "LINK" --model medium                                # phụ đề chính xác hơn, chậm hơn
-clipkit render "C:\Users\ban\Videos\ClipKit\ten-video-abc123"    # dựng lại sau khi sửa segments.json
-clipkit doctor                                                   # kiểm tra FFmpeg, GPU
+clipkit run "https://www.youtube.com/watch?v=VIDEO_ID"           # 5 clips, 20–60 seconds each
+clipkit run video.mp4 -n 8 --min 30 --max 90 --language vi       # local file
+clipkit run "LINK" --section 10:00-30:00                         # only process part of the video
+clipkit run "LINK" --layout crop --crop-x 0.4                    # fill the frame, shifted left
+clipkit run "LINK" --model medium                                # more accurate captions, slower
+clipkit render "C:\Users\you\Videos\ClipKit\video-name-abc123"   # re-render after editing segments.json
+clipkit doctor                                                   # check FFmpeg and GPU
 ```
 
-Kết quả nằm ở `Videos\ClipKit\<tên-video>\clips\`:
+Output goes to `Videos\ClipKit\<video-name>\clips\`:
 
-| File | Nội dung |
+| File | Contents |
 | :--- | :--- |
-| `01_tieu-de.mp4` | Clip 1080×1920, 30 fps, âm lượng chuẩn hóa −14 LUFS |
-| `01_tieu-de.srt` | Phụ đề rời, để tải lên kèm video |
-| `01_tieu-de.jpg` | Ảnh bìa |
-| `upload.txt` | Tiêu đề, mô tả, dòng ghi nguồn cho từng clip |
+| `01_title.mp4` | 1080×1920 clip, 30 fps, loudness normalized to −14 LUFS |
+| `01_title.srt` | Separate subtitle file to upload alongside the video |
+| `01_title.jpg` | Cover image |
+| `upload.txt` | Title, description and source credit line for each clip |
 
-Thư mục video còn có `transcript.json` (phụ đề toàn bộ) và `segments.json` (các đoạn được chọn). Chạy lại cùng một link sẽ dùng lại video và phụ đề đã có, không tải hay nhận dạng lại.
+The video folder also contains `transcript.json` (full transcript) and `segments.json` (the selected segments). Running the same link again reuses the downloaded video and transcript instead of downloading and transcribing again.
 
-### Tùy chọn chính
+### Main options
 
-| Tùy chọn | Mặc định | Ý nghĩa |
+| Option | Default | Meaning |
 | :--- | :--- | :--- |
-| `-n, --clips` | 5 | Số clip |
-| `--min / --max` | 20 / 60 | Độ dài mỗi clip (giây) |
+| `-n, --clips` | 5 | Number of clips |
+| `--min / --max` | 20 / 60 | Clip length in seconds |
 | `--model` | small | `tiny`, `base`, `small`, `medium`, `large-v3`, `turbo` |
-| `--language` | tự nhận | `vi`, `en`… đặt cố định thì chính xác hơn |
-| `--section` | cả video | Ví dụ `10:00-25:00` |
-| `--layout` | blur | `blur` video giữa nền mờ · `crop` cắt đầy khung · `fit` viền đen |
-| `--no-captions`, `--no-title`, `--uppercase` | | Tắt phụ đề, tắt tiêu đề, phụ đề viết hoa |
-| `--encoder` | auto | `nvenc` (GPU NVIDIA) hoặc `cpu` |
-| `--device` | auto | Whisper chạy `cuda` hay `cpu` |
-| `--selector` | heuristic | `llm` để nhờ model AI chọn (xem bên dưới) |
-| `--cookies-from-browser` | | `chrome`/`edge`/`firefox` khi trang bắt đăng nhập |
+| `--language` | auto-detect | `vi`, `en`… setting it explicitly is more accurate |
+| `--section` | whole video | e.g. `10:00-25:00` |
+| `--layout` | blur | `blur` video centered on a blurred background · `crop` fill the frame · `fit` black bars |
+| `--no-captions`, `--no-title`, `--uppercase` | | No captions, no title, uppercase captions |
+| `--encoder` | auto | `nvenc` (NVIDIA GPU) or `cpu` |
+| `--device` | auto | Run Whisper on `cuda` or `cpu` |
+| `--selector` | heuristic | `llm` to let an AI model pick (see below) |
+| `--cookies-from-browser` | | `chrome`/`edge`/`firefox` when the site requires login |
 
-## ClipKit chọn đoạn thế nào
+## How ClipKit picks moments
 
-Bản ghi được tách thành câu, rồi mọi cửa sổ gồm các câu liền nhau dài từ `--min` đến `--max` giây được chấm điểm theo:
+The transcript is split into sentences, then every window of consecutive sentences between `--min` and `--max` seconds long is scored on:
 
-- **Mật độ lời nói**: nói nhanh, ít khoảng lặng.
-- **Âm lượng**: đoạn to hơn mức trung bình của video thường là lúc hào hứng.
-- **Câu mở đầu**: câu hỏi, con số, từ khóa gây tò mò ("tại sao", "bí mật", "sai lầm", "tiền"…) được cộng điểm; mở bằng từ nối ("và", "nhưng", "thì", "vậy"…) bị trừ.
-- **Kết thúc trọn câu** và độ dài gần mức giữa.
+- **Speech density**: fast talking, few pauses.
+- **Loudness**: parts louder than the video's average are usually the exciting ones.
+- **Opening line**: questions, numbers and curiosity keywords ("why", "secret", "mistake", "money"… in Vietnamese and English) score higher; starting with a connective ("and", "but", "so"…) scores lower.
+- **Ending on a complete sentence** and a length close to the middle of the range.
 
-Các cửa sổ điểm cao nhất, không chồng lên nhau, được chọn. Cách này nhanh và miễn phí nhưng không hiểu nội dung như người; hãy xem `segments.json`, sửa `start`/`end`/`title` hoặc đặt `"enabled": false` cho đoạn không ưng, rồi chạy `clipkit render`.
+The highest-scoring non-overlapping windows are selected. This is fast and free but doesn't understand content the way a person does: review `segments.json`, edit `start`/`end`/`title` or set `"enabled": false` on segments you don't like, then run `clipkit render`.
 
-### Tùy chọn: nhờ AI chọn đoạn (`--selector llm`)
+### Optional: let an AI pick (`--selector llm`)
 
-Dùng được với mọi API tương thích OpenAI (OpenAI, DeepSeek, BytePlus ModelArk, OpenRouter, Ollama…). Chỉ gửi **một** yêu cầu mỗi video, giới hạn bởi `CLIPKIT_LLM_MAX_TOKENS` (mặc định 2000 token trả lời).
+Works with any OpenAI-compatible API (OpenAI, DeepSeek, BytePlus ModelArk, OpenRouter, Ollama…). Only **one** request is sent per video, capped by `CLIPKIT_LLM_MAX_TOKENS` (default 2000 response tokens).
 
 ```powershell
 $env:CLIPKIT_LLM_BASE_URL = "https://ark.ap-southeast.bytepluses.com/api/v3"
@@ -111,22 +111,22 @@ $env:CLIPKIT_LLM_MODEL    = "deepseek-v4-1-flash-260910"
 clipkit run "LINK" --selector llm
 ```
 
-## Bản quyền và kiếm tiền
+## Copyright and monetization
 
-ClipKit in giấy phép của video khi tải và cảnh báo nếu video không phải Creative Commons. Lưu ý:
+ClipKit prints the video's license when downloading and warns you if it is not Creative Commons. Keep in mind:
 
-- Chỉ đăng clip từ nội dung bạn sở hữu, được cấp phép, hoặc có giấy phép **Creative Commons Attribution** (lọc trên YouTube: Bộ lọc → Creative Commons). Với CC BY phải ghi nguồn; `upload.txt` đã có sẵn dòng ghi nguồn.
-- YouTube không bật kiếm tiền cho nội dung chỉ đăng lại mà không thêm giá trị mới (bình luận, biên tập, phân tích), kể cả khi được phép dùng.
+- Only publish clips from content you own, have permission to use, or that is licensed **Creative Commons Attribution** (on YouTube: Filters → Creative Commons). CC BY requires credit; `upload.txt` already includes a credit line.
+- YouTube does not monetize content that is simply re-uploaded without adding new value (commentary, editing, analysis), even when you are allowed to use it.
 
-## Mẹo tốc độ
+## Speed tips
 
-- Whisper là bước chậm nhất. `--model base` nhanh gấp khoảng 2 lần `small` nhưng sai chính tả nhiều hơn; `--section` để chỉ xử lý khúc cần.
-- **Whisper trên GPU NVIDIA**: cần thêm thư viện CUDA 12 (cuBLAS, cuDNN 9). Nếu thiếu, ClipKit tự chuyển sang CPU và báo trong log.
-- Dựng clip dùng NVENC khi có GPU NVIDIA, chỉ mất vài giây mỗi clip.
+- Whisper is the slowest step. `--model base` is about 2× faster than `small` but makes more spelling mistakes; use `--section` to process only the part you need.
+- **Whisper on an NVIDIA GPU** needs the CUDA 12 libraries (cuBLAS, cuDNN 9). If they are missing, ClipKit falls back to CPU automatically and says so in the log.
+- Rendering uses NVENC when an NVIDIA GPU is present, taking only a few seconds per clip.
 
-Model Whisper và FFmpeg tự tải được lưu ở `%LOCALAPPDATA%\ClipKit` (Windows) hoặc `~/.clipkit`.
+The automatically downloaded Whisper models and FFmpeg are stored in `%LOCALAPPDATA%\ClipKit` (Windows) or `~/.clipkit`.
 
-## Phát triển
+## Development
 
 ```bash
 python -m venv .venv && .venv\Scripts\activate
@@ -134,25 +134,25 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Build bản Windows (cần [Inno Setup 6](https://jrsoftware.org/isinfo.php) cho file cài):
+Build the Windows release (the installer needs [Inno Setup 6](https://jrsoftware.org/isinfo.php)):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1 -DownloadFfmpeg
 ```
 
-Ra `dist\ClipKit-Setup-<ver>.exe` và `dist\ClipKit-<ver>-portable.zip`. Đẩy tag `v*` lên GitHub thì workflow **Release** tự build và đính kèm hai file vào trang Releases.
+This produces `dist\ClipKit-Setup-<ver>.exe` and `dist\ClipKit-<ver>-portable.zip`. Pushing a `v*` tag to GitHub makes the **Release** workflow build both files and attach them to the Releases page.
 
 ```
 src/clipkit/
-  cli.py         lệnh run / render / doctor, chế độ hỏi đáp khi mở bằng double-click
-  pipeline.py    nối các bước, lưu kết quả trung gian để chạy lại nhanh
-  download.py    yt-dlp, đọc giấy phép
-  transcribe.py  faster-whisper, đo âm lượng
-  select.py      chấm điểm và chọn đoạn
-  llm.py         chọn đoạn bằng API (tùy chọn)
-  captions.py    phụ đề ASS tô sáng từng từ, SRT
-  render.py      FFmpeg: khung 9:16, NVENC/x264, chuẩn hóa âm lượng
-  deps.py        tìm hoặc tự tải FFmpeg, kiểm tra GPU
+  cli.py         run / render / doctor commands, interactive mode when double-clicked
+  pipeline.py    ties the steps together, caches intermediate results for fast re-runs
+  download.py    yt-dlp, license detection
+  transcribe.py  faster-whisper, loudness profile
+  select.py      moment scoring and selection
+  llm.py         AI-based selection via API (optional)
+  captions.py    ASS captions with per-word highlight, SRT
+  render.py      FFmpeg: 9:16 framing, NVENC/x264, loudness normalization
+  deps.py        find or auto-download FFmpeg, GPU checks
 ```
 
-Giấy phép MIT.
+MIT License.
