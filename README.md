@@ -121,7 +121,7 @@ The defaults follow YouTube's own guidance (checked November 2026):
 
 - **Encoding** follows [YouTube's recommended upload settings](https://support.google.com/youtube/answer/1722171): H.264 High profile, 2 B-frames, a closed GOP of half the frame rate, about 8-12 Mbps, BT.709 color, AAC 48 kHz, `faststart`. The source frame rate is kept (25, 30, 60…) instead of being forced to 30.
 - **Safe zones:** YouTube's title, channel name, Subscribe button and action buttons cover the bottom and right of a Short. Captions sit above the bottom ~520 px and away from the right-hand buttons; the title sits below the top bar.
-- **Length:** Shorts can be up to 3 minutes, but [a Short over 1 minute with any Content ID claim is blocked worldwide](https://support.google.com/youtube/answer/15424877). ClipKit defaults to 20-60 s and warns when you go longer.
+- **Length:** Shorts can be up to 3 minutes, but [a Short over 1 minute with an active Content ID claim is blocked on YouTube and can't be monetized](https://support.google.com/youtube/answer/6013276) (claims can apply to some regions only). ClipKit defaults to 20-60 s and warns when you go longer.
 - **`#shorts` is not needed** (length and aspect ratio decide), so `upload.txt` leaves hashtags to you; [up to 3 relevant ones](https://support.google.com/youtube/answer/6390658) show above the title.
 - **Captions:** they are burned in and also written as `.srt`, which you can upload so viewers can switch them off.
 
@@ -130,6 +130,7 @@ The defaults follow YouTube's own guidance (checked November 2026):
 ClipKit shows the video's license and warns when it is not Creative Commons.
 
 - Only post clips of content you own, have permission for, or that is licensed **Creative Commons Attribution** (YouTube: Filters → Creative Commons). [CC BY needs credit](https://support.google.com/youtube/answer/2797468); *Copy title & description* includes it.
+- The CC label is set **per video** by the uploader, not per channel: check each video (ClipKit saves the label it found in the project's `info.json`). Music or footage inside a CC video can still be claimed, and a CC license does not make plain clips eligible for monetization (see the next point).
 - YouTube's [reused content policy](https://support.google.com/youtube/answer/1311392) does not monetize clips "edited together with little or no narrative", even with permission. Add your own value: commentary, context, analysis or a voice-over.
 - In October 2026 YouTube said Shorts channels that mostly repost other people's clips get less reach ([Creator Insider](https://www.youtube.com/watch?v=XS2A6aExLaA)). Plan to add something original to each Short.
 

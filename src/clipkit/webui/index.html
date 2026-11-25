@@ -451,8 +451,10 @@ function renderMoments() {
   head.append(h("div", { class: "proj-head" }, h("div", { style: "flex:1" },
     h("h1", {}, info.title || p.id),
     h("div", { class: "meta" }, info.uploader ? h("span", {}, info.uploader) : null, info.duration ? h("span", {}, "· " + tsShort(info.duration)) : null,
-      info.license ? h("span", { class: "pill " + (isCC(info.license) ? "ok" : "warn"), title: info.license },
-        isCC(info.license) ? "Creative Commons: reuse with credit" : "Not Creative Commons: only post if you have the rights") : null,
+      info.license ? h("span", { class: "pill " + (isCC(info.license) ? "ok" : "warn"), title: isCC(info.license)
+        ? `${info.license}. The uploader set this label for this video only. Music in it can still be claimed, and plain clips may not be monetized.`
+        : info.license },
+        isCC(info.license) ? "This video is Creative Commons: reuse with credit" : "Not Creative Commons: only post if you have the rights") : null,
       info.url ? h("a", { href: info.url, target: "_blank", class: "link" }, "Source ↗") : null))));
   const segs = p.segments;
   box.innerHTML = "";

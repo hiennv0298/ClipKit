@@ -67,8 +67,8 @@ def prepare(source: str, opts: Options, on_workdir=None) -> tuple[Path, dict, li
     transcript = ensure_transcript(workdir, ff, opts)
     log("[3/4] Picking the best moments")
     if opts.max_len > 60:
-        log("      Note: a Short longer than 60 s is blocked worldwide if it gets any Content ID claim. "
-            "Keep clips to 60 s unless you own the content.")
+        log("      Note: a Short longer than 60 s is blocked on YouTube (and not monetized) if it gets a Content ID "
+            "claim, for example on music in the video. Keep clips to 60 s unless you own the content.")
     segments = ensure_segments(workdir, transcript, opts)
     return workdir, transcript, segments
 

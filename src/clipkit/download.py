@@ -147,7 +147,8 @@ def source_video(workdir: Path) -> Path:
 def _warn_license(meta: dict) -> None:
     lic = meta.get("license") or ""
     if "creative commons" in lic.lower():
-        log(f"  License: {lic}. Reuse is allowed with credit (ClipKit writes it to upload.txt).")
+        log(f"  License: {lic}. The uploader marked this video for reuse with credit (ClipKit writes the credit "
+            "to upload.txt). The label covers this video only; music in it can still be claimed.")
     else:
         log("  WARNING: this video is not Creative Commons licensed. Only publish clips if you have the rights,"
             " otherwise they may be taken down or demonetized.")
